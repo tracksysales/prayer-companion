@@ -1975,7 +1975,12 @@ function YusufFloatingChat({ open, onToggle }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [yusufState, setYusufState] = useState('waving');
+  const [btnPos, setBtnPos] = useLocalStorage('pc_yusuf_pos', null);
+  const [isDragging, setIsDragging] = useState(false);
   const bottomRef = useRef(null);
+  const btnRef = useRef(null);
+  const longPressTimer = useRef(null);
+  const drag = useRef({ active: false, moved: false, startX: 0, startY: 0, offsetX: 0, offsetY: 0 });
 
   useEffect(() => {
     try { localStorage.setItem('pc_chat_history', JSON.stringify(messages)); } catch {}
@@ -2048,20 +2053,94 @@ function YusufFloatingChat({ open, onToggle }) {
 
   function hasArabic(text) { return /[\u0600-\u06FF]/.test(text); }
 
+  /* ── Long-press drag handlers ── */
+  function onBtnPointerDown(e) {
+    // Only handle primary button / touch
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+
+    const d = drag.current;
+    d.moved = false;
+    d.active = false;
+    d.startX = e.clientX;
+    d.startY = e.clientY;
+
+    const rect = btnRef.current?.getBoundingClientRect();
+    d.offsetX = e.clientX - (rect?.left ?? 0);
+    d.offsetY = e.clientY - (rect?.top ?? 0);
+
+    // Capture pointer so move/up fire even outside element
+    try { btnRef.current?.setPointerCapture(e.pointerId); } catch {}
+
+    longPressTimer.current = setTimeout(() => {
+      d.active = true;
+      setIsDragging(true);
+      try { navigator.vibrate?.(50); } catch {}
+    }, 500);
+  }
+
+  function onBtnPointerMove(e) {
+    const d = drag.current;
+    const dx = Math.abs(e.clientX - d.startX);
+    const dy = Math.abs(e.clientY - d.startY);
+    if (dx > 5 || dy > 5) d.moved = true;
+
+    if (!d.active) return;
+
+    const BTN = 72;
+    const nx = Math.max(0, Math.min(window.innerWidth - BTN, e.clientX - d.offsetX));
+    const ny = Math.max(0, Math.min(window.innerHeight - BTN, e.clientY - d.offsetY));
+    setBtnPos({ x: nx, y: ny });
+  }
+
+  function onBtnPointerUp() {
+    clearTimeout(longPressTimer.current);
+    const d = drag.current;
+    const wasDragging = d.active;
+    d.active = false;
+    setIsDragging(false);
+    // Only toggle if it was a clean tap (no drag, no long-press)
+    if (!wasDragging && !d.moved) onToggle();
+  }
+
+  /* ── Position calculations ── */
+  const BTN_SIZE = 72;
+  const PANEL_W = 420;
+  const PANEL_H = 600;
+  const GAP = 12;
+
+  const btnStyle = btnPos
+    ? { left: btnPos.x, top: btnPos.y, bottom: 'auto', right: 'auto' }
+    : { bottom: '24px', right: '24px' };
+
+  let panelStyle;
+  if (btnPos) {
+    // Right-align panel to button; clamp inside viewport
+    let px = Math.max(8, Math.min(window.innerWidth - PANEL_W - 8, btnPos.x + BTN_SIZE - PANEL_W));
+    // Open above if there's room, otherwise below
+    const openAbove = btnPos.y >= PANEL_H + GAP + BTN_SIZE;
+    let py = openAbove
+      ? btnPos.y - PANEL_H - GAP
+      : btnPos.y + BTN_SIZE + GAP;
+    py = Math.max(8, Math.min(window.innerHeight - PANEL_H - 8, py));
+    panelStyle = { left: px, top: py, bottom: 'auto', right: 'auto' };
+  } else {
+    panelStyle = { bottom: `${BTN_SIZE + 16}px`, right: '24px' };
+  }
+
   const isWelcomeOnly = messages.length === 1;
 
   return (
     <>
-      {/* ── Floating chat panel ── */}
+      {/* ── Chat panel ── */}
       {open && (
         <div
           className="fixed z-50 flex flex-col rounded-2xl overflow-hidden shadow-2xl"
           style={{
-            bottom: '88px',
-            right: '24px',
-            width: '360px',
+            ...panelStyle,
+            width: `${PANEL_W}px`,
             maxWidth: 'calc(100vw - 32px)',
-            height: '520px',
+            height: `${PANEL_H}px`,
             background: 'rgba(8, 16, 36, 0.97)',
             border: '1px solid rgba(212,175,55,0.35)',
             backdropFilter: 'blur(24px)',
@@ -2079,10 +2158,7 @@ function YusufFloatingChat({ open, onToggle }) {
               <div className="text-[10px] text-gold-dim">Islamic Q&amp;A · Not a scholarly ruling</div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <button
-                onClick={newConversation}
-                className="text-[10px] px-2 py-1 rounded border gold-border hover:bg-gold/10 transition gold-text"
-              >
+              <button onClick={newConversation} className="text-[10px] px-2 py-1 rounded border gold-border hover:bg-gold/10 transition gold-text">
                 New
               </button>
               <button onClick={onToggle} className="p-1 hover:bg-white/5 rounded-full transition" aria-label="Close chat">
@@ -2093,7 +2169,6 @@ function YusufFloatingChat({ open, onToggle }) {
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
-
             {/* Welcome + starters */}
             {isWelcomeOnly && (
               <div className="flex items-end gap-2">
@@ -2118,7 +2193,7 @@ function YusufFloatingChat({ open, onToggle }) {
               </div>
             )}
 
-            {/* Chat transcript — skip index 0 (welcome) when shown above */}
+            {/* Chat transcript */}
             {messages.slice(isWelcomeOnly ? 1 : 0).map((m, i, arr) => (
               m.role === 'user' ? (
                 <div key={i} className="flex justify-end">
@@ -2206,25 +2281,43 @@ function YusufFloatingChat({ open, onToggle }) {
 
       {/* ── Floating toggle button ── */}
       <button
-        onClick={onToggle}
-        className="fixed z-50 w-16 h-16 rounded-full overflow-hidden shadow-2xl border-2 transition-transform duration-200 hover:scale-110 active:scale-95"
+        ref={btnRef}
+        onPointerDown={onBtnPointerDown}
+        onPointerMove={onBtnPointerMove}
+        onPointerUp={onBtnPointerUp}
+        onPointerCancel={onBtnPointerUp}
+        className="fixed z-50 rounded-full border-2 select-none overflow-visible"
         style={{
-          bottom: '24px',
-          right: '24px',
-          borderColor: '#d4af37',
-          background: '#0a1628',
-          boxShadow: open
-            ? '0 0 0 4px rgba(212,175,55,0.25), 0 8px 32px rgba(0,0,0,0.6)'
-            : '0 4px 24px rgba(0,0,0,0.5)',
+          ...btnStyle,
+          width: BTN_SIZE,
+          height: BTN_SIZE,
+          borderColor: isDragging ? '#f5d060' : '#d4af37',
+          background: 'transparent',
+          touchAction: 'none',
+          cursor: isDragging ? 'grabbing' : 'pointer',
+          transition: isDragging ? 'none' : 'box-shadow 0.2s',
+          boxShadow: isDragging
+            ? '0 0 0 6px rgba(212,175,55,0.4), 0 16px 48px rgba(0,0,0,0.8)'
+            : open
+            ? '0 0 0 4px rgba(212,175,55,0.2), 0 8px 32px rgba(0,0,0,0.6)'
+            : '0 4px 20px rgba(0,0,0,0.5)',
         }}
-        aria-label={open ? 'Close Yusuf chat' : 'Ask Yusuf about Islam'}
+        aria-label={open ? 'Close Yusuf chat' : 'Ask Yusuf about Islam — long press to reposition'}
       >
         <img
-          src="/images/yusuf/yusuf-waving.png"
+          src={`/images/yusuf/yusuf-${isDragging ? 'happy' : 'waving'}.png`}
           alt="Yusuf"
-          className="w-full h-full object-contain p-1.5"
-          style={{ filter: 'drop-shadow(0 2px 6px rgba(212,175,55,0.5))' }}
+          className={`w-full h-full object-contain ${isDragging ? '' : 'yusuf-idle'}`}
+          style={{ filter: 'drop-shadow(0 4px 14px rgba(212,175,55,0.55))' }}
+          draggable={false}
         />
+        {/* Drag-mode pulse ring */}
+        {isDragging && (
+          <span
+            className="absolute inset-[-6px] rounded-full pointer-events-none"
+            style={{ border: '2px dashed rgba(212,175,55,0.6)', animation: 'yusuf-float 1s ease-in-out infinite' }}
+          />
+        )}
       </button>
     </>
   );
