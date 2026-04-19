@@ -487,6 +487,7 @@ export default function App() {
   const [openQibla, setOpenQibla] = useState(false);
   const [openTasbih, setOpenTasbih] = useState(false);
   const [openAdhkar, setOpenAdhkar] = useState(null); // 'morning' | 'evening' | null
+  const [openDuaLibrary, setOpenDuaLibrary] = useState(false);
   const [guidedRakats, setGuidedRakats] = useState(2);
 
   const adhanAudioRef = useRef(null);
@@ -876,6 +877,12 @@ export default function App() {
                   <div className="font-display text-lg mb-1">Evening Adhkar</div>
                   <div className="text-xs text-gold-dim">After Asr</div>
                 </button>
+                <button onClick={() => setOpenDuaLibrary(true)}
+                  className="p-5 rounded-sm border gold-border text-left hover:bg-gold/5 transition">
+                  <div className="text-2xl mb-2">🤲</div>
+                  <div className="font-display text-lg mb-1">Dua Library</div>
+                  <div className="text-xs text-gold-dim">40+ duas by situation</div>
+                </button>
               </div>
             </div>
 
@@ -1007,6 +1014,10 @@ export default function App() {
 
         {openAdhkar && (
           <AdhkarModal mode={openAdhkar} onClose={() => setOpenAdhkar(null)} />
+        )}
+
+        {openDuaLibrary && (
+          <DuaLibraryModal onClose={() => setOpenDuaLibrary(false)} />
         )}
 
         {/* Settings modal */}
@@ -1395,6 +1406,146 @@ function AdhkarModal({ mode, onClose }) {
       {current.count === 1 && (
         <div className="text-center mt-2 text-xs text-gold-dim">Tap Next when ready</div>
       )}
+    </Modal>
+  );
+}
+
+/* ============================================================
+   DUA LIBRARY — Duas from Hisn al-Muslim, organized by situation
+   ============================================================ */
+
+const DUA_CATEGORIES = [
+  'All', 'Daily Life', 'Morning/Evening', 'Protection', 'Difficult Times', 'Relationships', 'Special Occasions',
+];
+
+const DUA_LIBRARY = [
+  // DAILY LIFE
+  { id: 'd1', cat: 'Daily Life', situation: 'Before eating', arabic: 'بِسْمِ اللَّهِ', translit: 'Bismillah', translation: 'In the name of Allah.', source: 'Hisn al-Muslim #204', context: 'Say Bismillah before eating. If you forget at the beginning, say: Bismillahi fi awwalihi wa akhirih.' },
+  { id: 'd2', cat: 'Daily Life', situation: 'After eating', arabic: 'الْحَمْدُ لِلَّهِ الَّذِي أَطْعَمَنِي هَذَا وَرَزَقَنِيهِ مِنْ غَيْرِ حَوْلٍ مِنِّي وَلَا قُوَّةٍ', translit: "Alhamdu lillahil-ladhi at'amani hadha wa razaqanihi min ghayri hawlin minni wa la quwwah", translation: 'Praise be to Allah who fed me this and provided it for me without any power or strength on my part.', source: 'Hisn al-Muslim #205 — Abu Dawud 4023', context: 'Whoever says this after eating, his past sins will be forgiven.' },
+  { id: 'd3', cat: 'Daily Life', situation: 'Entering home', arabic: 'بِسْمِ اللَّهِ وَلَجْنَا، وَبِسْمِ اللَّهِ خَرَجْنَا، وَعَلَى اللَّهِ رَبِّنَا تَوَكَّلْنَا', translit: "Bismillahi walajna, wa bismillahi kharajna, wa 'ala Allahi rabbina tawakkalna", translation: 'In the name of Allah we enter, in the name of Allah we leave, and upon Allah our Lord we rely.', source: 'Hisn al-Muslim #183 — Abu Dawud 5096', context: 'Then greet those in the home with salaam.' },
+  { id: 'd4', cat: 'Daily Life', situation: 'Leaving home', arabic: 'بِسْمِ اللَّهِ، تَوَكَّلْتُ عَلَى اللَّهِ، وَلَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ', translit: "Bismillah, tawakkaltu 'ala Allah, wa la hawla wa la quwwata illa billah", translation: 'In the name of Allah, I place my trust in Allah, and there is no power or strength except with Allah.', source: 'Hisn al-Muslim #182 — Abu Dawud 5095', context: 'Upon leaving the home. It will be said: You are guided, defended, and protected.' },
+  { id: 'd5', cat: 'Daily Life', situation: 'Before sleep', arabic: 'اللَّهُمَّ بِاسْمِكَ أَمُوتُ وَأَحْيَا', translit: 'Allahumma bismika amutu wa ahya', translation: 'O Allah, in Your name I die and I live.', source: 'Hisn al-Muslim #99 — Bukhari 6324', context: 'Recite upon lying down to sleep, on your right side.' },
+  { id: 'd6', cat: 'Daily Life', situation: 'Upon waking', arabic: 'الْحَمْدُ لِلَّهِ الَّذِي أَحْيَانَا بَعْدَ مَا أَمَاتَنَا وَإِلَيْهِ النُّشُورُ', translit: "Alhamdu lillahil-ladhi ahyana ba'da ma amatana wa ilayhin-nushur", translation: 'Praise be to Allah who gave us life after death, and to Him is the Resurrection.', source: 'Hisn al-Muslim #21 — Bukhari 6325', context: 'The first words upon waking.' },
+  { id: 'd7', cat: 'Daily Life', situation: 'Wearing new clothes', arabic: 'اللَّهُمَّ لَكَ الْحَمْدُ أَنْتَ كَسَوْتَنِيهِ، أَسْأَلُكَ مِنْ خَيْرِهِ وَخَيْرِ مَا صُنِعَ لَهُ، وَأَعُوذُ بِكَ مِنْ شَرِّهِ وَشَرِّ مَا صُنِعَ لَهُ', translit: "Allahumma lakal-hamd, anta kasawtaniyh, as'aluka min khayrihi wa khayri ma suni'a lah, wa a'udhu bika min sharrihi wa sharri ma suni'a lah", translation: 'O Allah, praise be to You. You clothed me with it. I ask You for its goodness and the goodness of what it was made for, and I seek refuge in You from its evil and the evil of what it was made for.', source: 'Hisn al-Muslim #191 — Abu Dawud 4020, Tirmidhi 1767', context: 'Said when wearing a new garment.' },
+  { id: 'd8', cat: 'Daily Life', situation: 'Looking in the mirror', arabic: 'اللَّهُمَّ أَنْتَ حَسَّنْتَ خَلْقِي فَحَسِّنْ خُلُقِي', translit: 'Allahumma anta hassanta khalqi fa-hassin khuluqi', translation: 'O Allah, just as You have made my physical form beautiful, make my character beautiful too.', source: 'Hisn al-Muslim #192 — Ahmad (authenticated)', context: 'Said when looking in the mirror.' },
+  { id: 'd9', cat: 'Daily Life', situation: 'Riding a vehicle', arabic: 'سُبْحَانَ الَّذِي سَخَّرَ لَنَا هَذَا وَمَا كُنَّا لَهُ مُقْرِنِينَ وَإِنَّا إِلَى رَبِّنَا لَمُنقَلِبُونَ', translit: 'Subhanal-ladhi sakhkhara lana hadha wa ma kunna lahu muqrinin, wa inna ila rabbina lamunqalibun', translation: 'Glory be to He who has subjected this to us, and we were not capable of it (ourselves), and indeed to our Lord we shall return.', source: 'Hisn al-Muslim #193 — Quran 43:13-14', context: 'Said when mounting any vehicle or means of transport.' },
+  { id: 'd10', cat: 'Daily Life', situation: 'Visiting the sick', arabic: 'لَا بَأْسَ طَهُورٌ إِنْ شَاءَ اللَّهُ', translit: "La ba's, tahurun in sha'a Allah", translation: 'Do not worry, it is a purification, if Allah wills.', source: 'Hisn al-Muslim #148 — Bukhari 5656', context: 'Said to someone who is sick — illness expiates sins as a purification.' },
+  { id: 'd11', cat: 'Daily Life', situation: 'Traveling', arabic: 'اللَّهُمَّ إِنَّا نَسْأَلُكَ فِي سَفَرِنَا هَذَا الْبِرَّ وَالتَّقْوَى، وَمِنَ الْعَمَلِ مَا تَرْضَى', translit: "Allahumma inna nas'aluka fi safarina hadhal-birra wat-taqwa, wa minal-'amali ma tarda", translation: 'O Allah, we ask You for righteousness and piety in this journey of ours, and for deeds which please You.', source: 'Hisn al-Muslim #196 — Muslim 1342', context: 'Dua for starting a journey.' },
+
+  // MORNING/EVENING
+  { id: 'me1', cat: 'Morning/Evening', situation: 'Morning protection', arabic: 'اللَّهُمَّ بِكَ أَصْبَحْنَا وَبِكَ أَمْسَيْنَا وَبِكَ نَحْيَا وَبِكَ نَمُوتُ وَإِلَيْكَ النُّشُورُ', translit: 'Allahumma bika asbahna wa bika amsayna wa bika nahya wa bika namutu wa ilaykan-nushur', translation: 'O Allah, by You we enter the morning and by You we enter the evening. By You we live and by You we die, and to You is the Resurrection.', source: 'Hisn al-Muslim #25 — Abu Dawud 5068', context: 'Morning: replace "amsayna" with "asbahna". Evening: replace "asbahna" with "amsayna".' },
+  { id: 'me2', cat: 'Morning/Evening', situation: 'Evening protection', arabic: 'أَعُوذُ بِكَلِمَاتِ اللَّهِ التَّامَّاتِ مِنْ شَرِّ مَا خَلَقَ', translit: "A'udhu bi-kalimatillahit-tammati min sharri ma khalaq", translation: 'I seek refuge in the perfect words of Allah from the evil of what He has created.', source: 'Hisn al-Muslim #80 — Muslim 2709', context: 'Recited 3 times in the evening — whoever says it will not be harmed by any sting that night.' },
+
+  // PROTECTION
+  { id: 'p1', cat: 'Protection', situation: 'Entering bathroom', arabic: 'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْخُبُثِ وَالْخَبَائِثِ', translit: "Allahumma inni a'udhu bika minal-khubuthi wal-khaba'ith", translation: 'O Allah, I seek refuge in You from male and female devils.', source: 'Hisn al-Muslim #161 — Bukhari 142, Muslim 375', context: 'Said before entering the bathroom. Enter with left foot.' },
+  { id: 'p2', cat: 'Protection', situation: 'Leaving bathroom', arabic: 'غُفْرَانَكَ', translit: 'Ghufranaka', translation: 'I seek Your forgiveness.', source: 'Hisn al-Muslim #162 — Abu Dawud 30, Tirmidhi 7', context: 'Said upon leaving the bathroom. Exit with right foot.' },
+  { id: 'p3', cat: 'Protection', situation: 'During thunder', arabic: 'سُبْحَانَ الَّذِي يُسَبِّحُ الرَّعْدُ بِحَمْدِهِ', translit: "Subhanal-ladhi yusabbihur-ra'du bihamdihi", translation: 'Glory be to He Whom the thunder glorifies with His praise.', source: 'Hisn al-Muslim #78 — Muwatta Malik 1748 (authenticated)', context: 'Said when hearing thunder.' },
+  { id: 'p4', cat: 'Protection', situation: 'Seeing something disliked', arabic: 'اللَّهُمَّ لَا يَأْتِي بِالْحَسَنَاتِ إِلَّا أَنْتَ وَلَا يَدْفَعُ السَّيِّئَاتِ إِلَّا أَنْتَ وَلَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ', translit: "Allahumma la ya'ti bil-hasanati illa anta, wa la yadfa'us-sayyi'ati illa ant, wa la hawla wa la quwwata illa billah", translation: 'O Allah, none brings good things except You, and none repels evil things except You, and there is no power or strength except with Allah.', source: 'Hisn al-Muslim #79', context: 'Said upon seeing something disliked.' },
+  { id: 'p5', cat: 'Protection', situation: 'Seeing something you like', arabic: 'اللَّهُمَّ صَيِّبًا نَافِعًا', translit: "Allahumma sayyiban nafi'an", translation: 'O Allah, (make it) a beneficial rainfall.', source: 'Hisn al-Muslim #77 — Bukhari 1032', context: 'Said when seeing rain or something beautiful Allah has created.' },
+  { id: 'p6', cat: 'Protection', situation: 'During strong wind', arabic: 'اللَّهُمَّ إِنِّي أَسْأَلُكَ خَيْرَهَا وَخَيْرَ مَا فِيهَا وَخَيْرَ مَا أُرْسِلَتْ بِهِ', translit: "Allahumma inni as'aluka khayriha wa khayra ma fiha wa khayra ma ursilat bih", translation: 'O Allah, I ask You for its good and the good within it and the good it was sent with, and I seek refuge in You from its evil.', source: 'Hisn al-Muslim #76 — Muslim 899', context: 'Said during strong wind.' },
+
+  // DIFFICULT TIMES
+  { id: 'dt1', cat: 'Difficult Times', situation: 'When worried or distressed', arabic: 'اللَّهُمَّ إِنِّي عَبْدُكَ، ابْنُ عَبْدِكَ، ابْنُ أَمَتِكَ، نَاصِيَتِي بِيَدِكَ، مَاضٍ فِيَّ حُكْمُكَ، عَدْلٌ فِيَّ قَضَاؤُكَ', translit: "Allahumma inni 'abduk, ibnu 'abdik, ibnu amatik, nasiyati biyadik, madin fiyya hukmuk, 'adlun fiyya qada'uk...", translation: 'O Allah, I am Your servant, son of Your servant, son of Your handmaid. My forelock is in Your hand. Your judgement is forever executed upon me; Your decree over me is just. I ask You by every name belonging to You which You named Yourself, or revealed in Your book, or You taught to any of Your creation, or have preserved in the knowledge of the unseen with You, that You make the Quran the spring of my heart...', source: 'Hisn al-Muslim #119 — Ahmad 3712, authenticated', context: 'The Prophet said: "No one ever says this when afflicted except that Allah removes his distress and replaces it with joy and relief."' },
+  { id: 'dt2', cat: 'Difficult Times', situation: 'When angry', arabic: 'أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ', translit: "A'udhu billahi minash-shaytanir-rajeem", translation: 'I seek refuge in Allah from Satan, the accursed.', source: 'Hisn al-Muslim #143 — Bukhari 3282, Muslim 2610', context: 'Two men argued before the Prophet. One grew red with anger. The Prophet said: "I know a word which would remove his anger if he said it."' },
+  { id: 'dt3', cat: 'Difficult Times', situation: 'When in pain', arabic: 'أَعُوذُ بِعِزَّةِ اللَّهِ وَقُدْرَتِهِ مِنْ شَرِّ مَا أَجِدُ وَأُحَاذِرُ', translit: "A'udhu bi-'izzatillahi wa qudratihi min sharri ma ajidu wa uhadhir", translation: 'I seek refuge in the might of Allah and His power from the evil of what I experience and what I fear.', source: 'Hisn al-Muslim #130 — Muslim 2202', context: 'Place your hand on the area of pain and say this 7 times. The Prophet taught this to Uthman ibn Abi al-As (RA).' },
+  { id: 'dt4', cat: 'Difficult Times', situation: 'When afraid', arabic: 'اللَّهُمَّ إِنَّا نَجْعَلُكَ فِي نُحُورِهِمْ وَنَعُوذُ بِكَ مِنْ شُرُورِهِمْ', translit: "Allahumma inna naj'aluka fi nuhurihim wa na'udhu bika min shururihim", translation: 'O Allah, we place You before them and seek refuge in You from their evils.', source: 'Hisn al-Muslim #123 — Abu Dawud 1537', context: 'Said when fearing people or a group.' },
+  { id: 'dt5', cat: 'Difficult Times', situation: 'When facing a difficult matter', arabic: 'اللَّهُمَّ لَا سَهْلَ إِلَّا مَا جَعَلْتَهُ سَهْلاً وَأَنْتَ تَجْعَلُ الْحَزَنَ إِذَا شِئْتَ سَهْلاً', translit: "Allahumma la sahla illa ma ja'altahu sahla, wa anta taj'alul-hazna idha shi'ta sahla", translation: 'O Allah, there is nothing easy except what You make easy, and You make the difficult, if You wish, easy.', source: 'Hisn al-Muslim #121 — Ibn Hibban (authenticated)', context: 'Said when confronting any difficulty or hardship.' },
+  { id: 'dt6', cat: 'Difficult Times', situation: "Upon hearing of someone's death", arabic: 'إِنَّا لِلَّهِ وَإِنَّا إِلَيْهِ رَاجِعُونَ', translit: "Inna lillahi wa inna ilayhi raji'un", translation: 'Indeed, we belong to Allah, and indeed to Him we shall return.', source: 'Hisn al-Muslim #149 — Quran 2:156', context: 'The Quran says Allah bestows blessings and mercy on those who say this upon affliction.' },
+
+  // RELATIONSHIPS
+  { id: 'r1', cat: 'Relationships', situation: 'For parents', arabic: 'رَبِّ ارْحَمْهُمَا كَمَا رَبَّيَانِي صَغِيرًا', translit: 'Rabbir-hamhuma kama rabbayani saghira', translation: 'My Lord, have mercy upon them as they raised me when I was small.', source: 'Hisn al-Muslim — Quran 17:24', context: 'From the Quran — the command to make this dua for parents.' },
+  { id: 'r2', cat: 'Relationships', situation: 'For spouse', arabic: 'اللَّهُمَّ أَصْلِحْ لِي زَوْجِي وَأَصْلِحْنِي لَهُ', translit: 'Allahumma aslih li zawji wa aslihni lah', translation: 'O Allah, correct my spouse for me and correct me for my spouse.', source: 'Reported in authentic supplications', context: 'A dua for marital harmony and being the best spouse possible.' },
+  { id: 'r3', cat: 'Relationships', situation: 'For children', arabic: 'رَبِّ هَبْ لِي مِنَ الصَّالِحِينَ', translit: 'Rabbi hab li minas-salihin', translation: 'My Lord, grant me [a child] from among the righteous.', source: 'Hisn al-Muslim — Quran 37:100', context: 'The dua of Ibrahim (AS) for a righteous child.' },
+  { id: 'r4', cat: 'Relationships', situation: 'For the deceased', arabic: 'اللَّهُمَّ اغْفِرْ لَهُ وَارْحَمْهُ وَعَافِهِ وَاعْفُ عَنْهُ', translit: "Allahummaghfir lahu warhamhu wa 'afihi wa'fu 'anh", translation: 'O Allah, forgive him/her, have mercy on him/her, pardon him/her, and excuse him/her.', source: 'Hisn al-Muslim #164 — Muslim 963', context: 'Said for the deceased in the funeral prayer. One of the most comprehensive duas for the dead.' },
+
+  // SPECIAL OCCASIONS
+  { id: 's1', cat: 'Special Occasions', situation: 'Entering the mosque', arabic: 'اللَّهُمَّ افْتَحْ لِي أَبْوَابَ رَحْمَتِكَ', translit: 'Allahumaf-tah li abwaba rahmatik', translation: 'O Allah, open for me the gates of Your mercy.', source: 'Hisn al-Muslim #175 — Muslim 713', context: 'Enter with the right foot, and say "Bismillah was-salatu was-salam \'ala Rasulillah" before this.' },
+  { id: 's2', cat: 'Special Occasions', situation: 'Leaving the mosque', arabic: 'اللَّهُمَّ إِنِّي أَسْأَلُكَ مِنْ فَضْلِكَ', translit: "Allahumma inni as'aluka min fadlik", translation: 'O Allah, I ask You from Your bounty.', source: 'Hisn al-Muslim #176 — Muslim 713', context: 'Exit with the left foot.' },
+  { id: 's3', cat: 'Special Occasions', situation: 'After the adhan', arabic: 'اللَّهُمَّ رَبَّ هَذِهِ الدَّعْوَةِ التَّامَّةِ وَالصَّلَاةِ الْقَائِمَةِ، آتِ مُحَمَّدًا الْوَسِيلَةَ وَالْفَضِيلَةَ', translit: "Allahumma rabba hadhihid-da'watit-tammah was-salatil-qa'imah, ati Muhammadanil-wasilata wal-fadilah...", translation: 'O Allah, Lord of this perfect call and the prayer to be established, give Muhammad the right of intercession and superiority...', source: 'Hisn al-Muslim #18 — Bukhari 614', context: 'Said after hearing the adhan. The Prophet said his intercession becomes assured for whoever says this.' },
+  { id: 's4', cat: 'Special Occasions', situation: 'For Laylatul Qadr', arabic: 'اللَّهُمَّ إِنَّكَ عَفُوٌّ تُحِبُّ الْعَفْوَ فَاعْفُ عَنِّي', translit: "Allahumma innaka 'afuwwun tuhibbul-'afwa fa'fu 'anni", translation: 'O Allah, You are forgiving and love forgiveness, so forgive me.', source: 'Hisn al-Muslim — Tirmidhi 3513', context: 'Aisha (RA) asked: If I knew it was Laylatul Qadr, what should I say? The Prophet taught her this dua.' },
+  { id: 's5', cat: 'Special Occasions', situation: 'Breaking fast (Iftar)', arabic: 'اللَّهُمَّ لَكَ صُمْتُ وَعَلَى رِزْقِكَ أَفْطَرْتُ', translit: "Allahumma laka sumtu wa 'ala rizqika aftart", translation: 'O Allah, for You I fasted and upon Your provision I break my fast.', source: 'Hisn al-Muslim #115 — Abu Dawud 2358', context: 'Said at Iftar (breaking fast at Maghrib). At the moment of breaking fast the dua is not rejected.' },
+  { id: 's6', cat: 'Special Occasions', situation: 'During Ramadan', arabic: 'رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ', translit: "Rabbana atina fid-dunya hasanatan wa fil-akhirati hasanatan wa qina 'adhaban-nar", translation: 'Our Lord, give us good in this world and good in the Hereafter, and protect us from the punishment of the Fire.', source: 'Quran 2:201', context: 'Anas (RA) said the Prophet recited this dua more than any other supplication.' },
+  { id: 's7', cat: 'Special Occasions', situation: 'Upon hearing adhan', arabic: 'أَشْهَدُ أَنْ لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، وَأَنَّ مُحَمَّدًا عَبْدُهُ وَرَسُولُهُ', translit: "Ashhadu an la ilaha illallah wahdahu la sharika lah, wa anna Muhammadan 'abduhu wa rasuluh", translation: 'I testify that there is no deity except Allah, alone without partner, and that Muhammad is His servant and Messenger.', source: 'Hisn al-Muslim #17 — Muslim 386', context: "Repeat each phrase of the adhan after the muadhin, except during hayya 'alas-salah say: La hawla wa la quwwata illa billah." },
+];
+
+function DuaLibraryModal({ onClose }) {
+  const [search, setSearch] = useState('');
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [expanded, setExpanded] = useState(null);
+
+  const filtered = DUA_LIBRARY.filter(d => {
+    const matchesCat = activeCategory === 'All' || d.cat === activeCategory;
+    const q = search.toLowerCase();
+    const matchesSearch = !q || d.situation.toLowerCase().includes(q) || d.translation.toLowerCase().includes(q) || d.arabic.includes(q);
+    return matchesCat && matchesSearch;
+  });
+
+  return (
+    <Modal onClose={onClose}>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="text-3xl">🤲</div>
+        <div>
+          <div className="font-display text-3xl">Dua Library</div>
+          <div className="text-xs text-gold-dim">Duas from Hisn al-Muslim, organized by situation</div>
+        </div>
+      </div>
+
+      {/* Search */}
+      <input
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        placeholder="Search duas..."
+        className="w-full px-4 py-2.5 mb-3 bg-transparent border gold-border rounded-sm text-cream placeholder-gold-dim/60 focus:outline-none focus:border-gold text-sm"
+      />
+
+      {/* Category filter chips */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {DUA_CATEGORIES.map(cat => (
+          <button key={cat} onClick={() => setActiveCategory(cat)}
+            className={`px-3 py-1 rounded-full text-xs border transition ${activeCategory === cat ? 'bg-gold text-midnight border-gold font-semibold' : 'gold-border hover:bg-gold/10 gold-text'}`}>
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      <div className="text-xs text-gold-dim mb-3">{filtered.length} duas found</div>
+
+      {/* Dua list */}
+      <div className="space-y-2">
+        {filtered.map(d => (
+          <div key={d.id} className="rounded-sm border gold-border overflow-hidden">
+            <button
+              onClick={() => setExpanded(expanded === d.id ? null : d.id)}
+              className="w-full p-4 text-left hover:bg-gold/5 transition flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs text-gold-dim uppercase tracking-wider mb-0.5">{d.cat}</div>
+                <div className="font-display text-base">{d.situation}</div>
+              </div>
+              <span className="text-gold-dim text-sm flex-shrink-0">{expanded === d.id ? '▲' : '▼'}</span>
+            </button>
+            {expanded === d.id && (
+              <div className="px-4 pb-4 border-t border-gold/20 pt-3" style={{ background: 'rgba(212,175,55,0.03)' }}>
+                <div className="font-arabic text-xl gold-text leading-loose mb-3">{d.arabic}</div>
+                <div className="text-sm text-gold-dim italic mb-2">{d.translit}</div>
+                <div className="text-sm leading-relaxed mb-3">{d.translation}</div>
+                <div className="text-xs text-gold-dim mb-2 italic">{d.context}</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-[10px] text-gold-dim">{d.source}</div>
+                  {hasSpeechSynthesis && (
+                    <button onClick={() => speakArabic(d.arabic)}
+                      className="flex items-center gap-1 text-xs px-3 py-1 rounded-sm border gold-border hover:bg-gold/10 transition gold-text">
+                      🔊 Hear Arabic
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+        {filtered.length === 0 && (
+          <div className="text-center text-sm text-gold-dim py-8">No duas found for your search.</div>
+        )}
+      </div>
     </Modal>
   );
 }
