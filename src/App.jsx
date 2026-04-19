@@ -67,13 +67,14 @@ const PRAYERS = {
 const PRAYER_ORDER = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
 
 const ADHAN_LIBRARY = [
-  { name: 'Makkah — Ali Ahmad Mulla', url: 'https://www.islamcan.com/audio/adhan/azan2.mp3' },
-  { name: 'Madinah — Essam Bukhari', url: 'https://www.islamcan.com/audio/adhan/azan3.mp3' },
-  { name: 'Classical Egyptian', url: 'https://www.islamcan.com/audio/adhan/azan4.mp3' },
-  { name: 'Turkish Maqam', url: 'https://www.islamcan.com/audio/adhan/azan5.mp3' },
-  { name: 'Yusuf Islam', url: 'https://www.islamcan.com/audio/adhan/azan6.mp3' },
-  { name: 'Mishary Rashid Alafasy', url: 'https://www.islamcan.com/audio/adhan/azan9.mp3' },
-  { name: 'Fajr — With "prayer is better than sleep"', url: 'https://www.islamcan.com/audio/adhan/azan1.mp3', fajrOnly: true },
+  { id: 'makkah',   name: 'Omar Hisham Al Arabi',         url: '/audio/adhan/makkah.mp3' },
+  { id: 'madinah',  name: 'Traditional Adhan',             url: '/audio/adhan/madinah.mp3' },
+  { id: 'alafasy',  name: 'Classic Adhan',                 url: '/audio/adhan/alafasy.mp3' },
+  { id: 'nasser',   name: 'Sheikh Nasser al Qatami',       url: '/audio/adhan/nasser.mp3' },
+  { id: 'sobhi',    name: 'Islam Sobhi',                   url: '/audio/adhan/sobhi.mp3' },
+  { id: 'yusuf',    name: 'Yusuf Islam',                   url: '/audio/adhan/yusuf.mp3' },
+  { id: 'beautiful',name: 'Beautiful Adhan',               url: '/audio/adhan/beautiful.mp3' },
+  { id: 'bosnia',   name: 'Bosnian / Balkan Style',        url: '/audio/adhan/bosnia.mp3' },
 ];
 
 const RECITERS = [
@@ -427,7 +428,8 @@ export default function App() {
   const [error, setError] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [now, setNow] = useState(new Date());
-  const [adhanIndex, setAdhanIndex] = useState(0);
+  const [adhanReciterId, setAdhanReciterId] = useLocalStorage('adhan_reciter', 'makkah');
+  const [previewingAdhanId, setPreviewingAdhanId] = useState(null); // id of reciter being previewed
   const [isAdhanPlaying, setIsAdhanPlaying] = useState(false);
   const [wakeLockActive, setWakeLockActive] = useState(false);
   const [openPrayer, setOpenPrayer] = useState(null);
@@ -517,27 +519,36 @@ export default function App() {
         });
       } catch {}
     }
-    const pool = prayerName === 'Fajr'
-      ? ADHAN_LIBRARY.filter(a => a.fajrOnly).concat(ADHAN_LIBRARY.filter(a => !a.fajrOnly))
-      : ADHAN_LIBRARY.filter(a => !a.fajrOnly);
-    const pick = pool[adhanIndex % pool.length];
-    setAdhanIndex((adhanIndex + 1) % pool.length);
+    // For Fajr prefer the fajr-specific version; otherwise use the selected reciter
+    let pick;
+    if (prayerName === 'Fajr') {
+      const fajrEntry = ADHAN_LIBRARY.find(a => a.fajrOnly && a.id === `${adhanReciterId}-fajr`);
+      pick = fajrEntry || ADHAN_LIBRARY.find(a => a.id === adhanReciterId) || ADHAN_LIBRARY[0];
+    } else {
+      pick = ADHAN_LIBRARY.find(a => !a.fajrOnly && a.id === adhanReciterId) || ADHAN_LIBRARY[0];
+    }
     playAdhan(pick.url);
   }
 
-  function playAdhan(url) {
+  function playAdhan(url, previewId = null) {
     if (!adhanAudioRef.current) return;
     adhanAudioRef.current.src = url;
+    adhanAudioRef.current.onended = () => {
+      setIsAdhanPlaying(false);
+      setPreviewingAdhanId(null);
+    };
     adhanAudioRef.current.play()
-      .then(() => setIsAdhanPlaying(true))
-      .catch(() => setIsAdhanPlaying(false));
+      .then(() => { setIsAdhanPlaying(true); setPreviewingAdhanId(previewId); })
+      .catch(() => { setIsAdhanPlaying(false); setPreviewingAdhanId(null); });
   }
 
   function stopAdhan() {
     if (adhanAudioRef.current) {
       adhanAudioRef.current.pause();
       adhanAudioRef.current.currentTime = 0;
+      adhanAudioRef.current.onended = null;
       setIsAdhanPlaying(false);
+      setPreviewingAdhanId(null);
     }
   }
 
@@ -810,11 +821,14 @@ export default function App() {
                 <div className="font-display text-2xl mb-1">Istikharah</div>
                 <div className="text-xs text-gold-dim">Seeking counsel from Allah for a decision you are facing.</div>
               </button>
-              <button onClick={() => isAdhanPlaying ? stopAdhan() : playAdhan(ADHAN_LIBRARY[adhanIndex].url)}
+              <button onClick={() => {
+                const entry = ADHAN_LIBRARY.find(a => !a.fajrOnly && a.id === adhanReciterId) || ADHAN_LIBRARY[0];
+                isAdhanPlaying ? stopAdhan() : playAdhan(entry.url, entry.id);
+              }}
                 className="p-6 rounded-sm border gold-border text-left hover:bg-gold/5 transition">
                 {isAdhanPlaying ? <Pause className="w-8 h-8 gold-text mb-3" /> : <Play className="w-8 h-8 gold-text mb-3" />}
                 <div className="font-display text-2xl mb-1">Preview Adhan</div>
-                <div className="text-xs text-gold-dim">{ADHAN_LIBRARY[adhanIndex].name}</div>
+                <div className="text-xs text-gold-dim">{(ADHAN_LIBRARY.find(a => !a.fajrOnly && a.id === adhanReciterId) || ADHAN_LIBRARY[0]).name}</div>
               </button>
             </div>
 
@@ -943,7 +957,7 @@ export default function App() {
               <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 px-6 py-3 rounded-full border-2 backdrop-strong flex items-center gap-3 shadow-2xl"
                 style={{ borderColor: '#d4af37', background: 'rgba(10, 22, 40, 0.9)' }}>
                 <div className="w-2 h-2 rounded-full bg-gold shimmer"></div>
-                <span className="text-sm font-display gold-text">Adhan playing · {ADHAN_LIBRARY[adhanIndex].name}</span>
+                <span className="text-sm font-display gold-text">Adhan playing · {(ADHAN_LIBRARY.find(a => a.id === (previewingAdhanId || adhanReciterId)) || ADHAN_LIBRARY[0]).name}</span>
                 <button onClick={stopAdhan} className="ml-2"><X className="w-4 h-4" /></button>
               </div>
             )}
@@ -1096,17 +1110,32 @@ export default function App() {
 
             <div className="mb-5">
               <label className="text-xs uppercase tracking-widest gold-text mb-2 block">Adhan Reciter</label>
-              <select value={adhanIndex} onChange={e => setAdhanIndex(Number(e.target.value))}
-                className="w-full px-3 py-2 bg-midnight border gold-border rounded-sm focus:outline-none focus:border-gold">
-                {ADHAN_LIBRARY.map((a, i) => (
-                  <option key={i} value={i}>{a.name}{a.fajrOnly ? ' (Fajr only)' : ''}</option>
+              <div className="space-y-2">
+                {ADHAN_LIBRARY.filter(a => !a.fajrOnly).map(a => (
+                  <div key={a.id}
+                    className={`flex items-center gap-3 p-3 rounded-sm border cursor-pointer transition ${adhanReciterId === a.id ? 'border-gold bg-gold/10' : 'gold-border hover:bg-gold/5'}`}
+                    onClick={() => { setAdhanReciterId(a.id); stopAdhan(); }}>
+                    <div className={`w-3 h-3 rounded-full border-2 flex-shrink-0 ${adhanReciterId === a.id ? 'bg-gold border-gold' : 'border-gold/50'}`}></div>
+                    <span className="flex-1 text-sm">{a.name}</span>
+                    {previewingAdhanId === a.id && isAdhanPlaying ? (
+                      <button
+                        onClick={e => { e.stopPropagation(); stopAdhan(); }}
+                        className="flex-shrink-0 px-2 py-1 rounded-sm border border-gold/50 text-xs gold-text hover:bg-gold/10 transition">
+                        ⏹ Stop
+                      </button>
+                    ) : (
+                      <button
+                        onClick={e => { e.stopPropagation(); stopAdhan(); setTimeout(() => playAdhan(a.url, a.id), 100); }}
+                        className="flex-shrink-0 px-2 py-1 rounded-sm border border-gold/50 text-xs gold-text hover:bg-gold/10 transition">
+                        ▶ Preview
+                      </button>
+                    )}
+                  </div>
                 ))}
-              </select>
-              <button
-                onClick={() => playAdhan(ADHAN_LIBRARY[adhanIndex].url)}
-                className="mt-2 text-xs px-3 py-1.5 rounded-sm border gold-border hover:bg-gold/10 transition gold-text">
-                ▶ Preview selected adhan
-              </button>
+              </div>
+              <div className="text-xs text-gold-dim mt-2">
+                Selection saved automatically. Fajr adhan will use the Makkah Fajr version when available.
+              </div>
             </div>
 
             <div className="mb-5 pt-4 border-t border-gold/20">
@@ -2582,67 +2611,75 @@ function SeerahSeriesModal({ onClose }) {
 }
 
 /* ============================================================
-   NEARBY MOSQUES — Overpass API (OpenStreetMap)
+   NEARBY MOSQUES — Google Places API (New) via /api/mosques/nearby
    ============================================================ */
 
 function NearbyMosquesModal({ location, onClose }) {
-  const CACHE_KEY = 'pc_mosques_cache';
-  const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
   const [mosques, setMosques] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [radius, setRadius] = useState(10000);
+  const [geoStatus, setGeoStatus] = useState('idle'); // idle | requesting | denied | ok
+
+  // Use passed location or request geolocation directly
+  const [coords, setCoords] = useState(
+    location?.lat && location?.lon ? { lat: location.lat, lng: location.lon } : null
+  );
 
   useEffect(() => {
-    if (location) loadMosques(radius);
+    if (coords) {
+      loadMosques(coords);
+    } else {
+      requestGeolocation();
+    }
   }, []); // eslint-disable-line
 
-  async function loadMosques(searchRadius) {
-    // Check cache
-    try {
-      const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
-      if (cached && Date.now() - cached.ts < CACHE_TTL && cached.lat === location.lat && cached.lon === location.lon && cached.radius === searchRadius) {
-        setMosques(cached.mosques);
-        return;
-      }
-    } catch {}
+  function requestGeolocation() {
+    if (!('geolocation' in navigator)) {
+      setError('Geolocation is not supported by your browser.');
+      return;
+    }
+    setGeoStatus('requesting');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setCoords(c);
+        setGeoStatus('ok');
+        loadMosques(c);
+      },
+      (err) => {
+        setGeoStatus('denied');
+        setError(
+          err.code === 1
+            ? 'Location access denied. Enable location in your browser settings and try again.'
+            : 'Could not determine your location. Please try again.'
+        );
+      },
+      { timeout: 10000, maximumAge: 300000 }
+    );
+  }
 
+  async function loadMosques(c) {
     setLoading(true);
     setError(null);
     try {
-      const query = `[out:json];node[amenity=place_of_worship][religion=muslim](around:${searchRadius},${location.lat},${location.lon});out;`;
-      const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Overpass API error');
+      const res = await fetch(`/api/mosques/nearby?lat=${c.lat}&lng=${c.lng}`);
       const data = await res.json();
-
-      const results = (data.elements || [])
-        .map(el => ({
-          id: el.id,
-          name: el.tags?.name || el.tags?.['name:en'] || 'Mosque',
-          lat: el.lat,
-          lon: el.lon,
-          distance: haversineDistance(location.lat, location.lon, el.lat, el.lon),
-        }))
-        .sort((a, b) => a.distance - b.distance)
-        .slice(0, 20);
-
-      setMosques(results);
-
-      // Cache result
-      localStorage.setItem(CACHE_KEY, JSON.stringify({
-        ts: Date.now(), lat: location.lat, lon: location.lon, radius: searchRadius, mosques: results,
-      }));
+      if (!res.ok) throw new Error(data.error || 'API error');
+      setMosques(data);
     } catch (e) {
-      setError('Could not load mosques. Check your internet connection.');
+      setError("Couldn't find nearby mosques. " + (e.message || 'Check your connection.'));
     } finally {
       setLoading(false);
     }
   }
 
-  function retry25km() {
-    setRadius(25000);
-    loadMosques(25000);
+  function milesLabel(meters) {
+    const miles = meters * 0.000621371;
+    return miles < 0.1 ? `${meters} m` : `${miles.toFixed(1)} mi`;
+  }
+
+  function kmLabel(meters) {
+    return meters < 1000 ? `${meters} m` : `${(meters / 1000).toFixed(1)} km`;
   }
 
   return (
@@ -2651,64 +2688,90 @@ function NearbyMosquesModal({ location, onClose }) {
         <div className="text-3xl">🕌</div>
         <div>
           <div className="font-display text-3xl">Nearby Mosques</div>
-          <div className="text-xs text-gold-dim">Within {radius >= 25000 ? '25' : '10'} km of {location?.city}</div>
+          <div className="text-xs text-gold-dim">
+            {coords ? `Within 20 km · ${location?.city || 'your location'}` : 'Detecting your location…'}
+          </div>
         </div>
       </div>
 
+      {/* Geolocation permission prompt */}
+      {geoStatus === 'requesting' && !loading && (
+        <div className="text-center py-4 text-sm text-gold-dim">
+          Requesting location permission…
+        </div>
+      )}
+
+      {/* Loading */}
       {loading && (
         <div className="text-center py-8">
-          <div className="text-gold-dim text-sm">Searching for mosques...</div>
+          <div className="text-gold-dim text-sm">Searching for mosques nearby…</div>
           <div className="mt-3 h-1 rounded bg-gold/20 overflow-hidden">
             <div className="h-full bg-gold animate-pulse" style={{ width: '60%' }}></div>
           </div>
         </div>
       )}
 
+      {/* Error */}
       {error && (
         <div className="p-4 rounded-sm border border-rose-500/40 bg-rose-900/20 text-rose-300 text-sm text-center mb-4">
           {error}
-          <button onClick={() => loadMosques(radius)} className="block mx-auto mt-2 text-xs underline">Try again</button>
+          <button
+            onClick={() => coords ? loadMosques(coords) : requestGeolocation()}
+            className="block mx-auto mt-2 text-xs underline">
+            Try again
+          </button>
         </div>
       )}
 
-      {!loading && mosques !== null && mosques.length === 0 && (
+      {/* Empty state */}
+      {!loading && !error && mosques !== null && mosques.length === 0 && (
         <div className="text-center py-8">
           <div className="text-2xl mb-3">🕌</div>
-          <div className="text-sm text-gold-dim mb-4">No mosques found within {radius >= 25000 ? '25' : '10'} km.</div>
-          {radius < 25000 && (
-            <button onClick={retry25km}
-              className="px-5 py-2 rounded-sm border-2 border-gold bg-gold/10 hover:bg-gold/20 transition gold-text font-semibold text-sm">
-              Expand search to 25 km
-            </button>
-          )}
+          <div className="text-sm text-gold-dim">No mosques found within 20 km of your location.</div>
         </div>
       )}
 
+      {/* Results */}
       {!loading && mosques && mosques.length > 0 && (
         <>
-          <div className="text-xs text-gold-dim mb-4">{mosques.length} mosque{mosques.length !== 1 ? 's' : ''} found</div>
+          <div className="text-xs text-gold-dim mb-4">
+            {mosques.length} mosque{mosques.length !== 1 ? 's' : ''} found
+          </div>
           <div className="space-y-2">
             {mosques.map(m => (
-              <div key={m.id} className="p-4 rounded-sm border gold-border flex items-center justify-between gap-3"
+              <div key={m.id} className="p-4 rounded-sm border gold-border"
                 style={{ background: 'rgba(212,175,55,0.03)' }}>
-                <div className="min-w-0">
-                  <div className="font-display text-base truncate">{m.name}</div>
-                  <div className="text-xs text-gold-dim">
-                    {m.distance < 1 ? `${Math.round(m.distance * 1000)} m` : `${m.distance.toFixed(1)} km`}
-                    {' '}· {(m.distance * 0.621371).toFixed(1)} mi
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-display text-base leading-tight">{m.name}</div>
+                    {m.address && (
+                      <div className="text-xs text-gold-dim mt-0.5 leading-tight">{m.address}</div>
+                    )}
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs text-gold-dim">
+                        {kmLabel(m.distanceMeters)} · {milesLabel(m.distanceMeters)}
+                      </span>
+                      {m.rating && (
+                        <span className="text-xs text-gold-dim">
+                          ★ {m.rating.toFixed(1)} ({m.ratingCount.toLocaleString()})
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${m.lat},${m.lng}&destination_place_id=${m.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-shrink-0 px-3 py-1.5 rounded-sm border gold-border hover:bg-gold/10 transition gold-text text-xs font-semibold whitespace-nowrap">
+                    Get Directions →
+                  </a>
                 </div>
-                <a
-                  href={`https://www.google.com/maps/dir/?api=1&destination=${m.lat},${m.lon}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-shrink-0 px-3 py-1.5 rounded-sm border gold-border hover:bg-gold/10 transition gold-text text-xs font-semibold whitespace-nowrap">
-                  Directions →
-                </a>
               </div>
             ))}
           </div>
-          <div className="mt-4 text-[10px] text-gold-dim text-center">Data from OpenStreetMap via Overpass API · Cached 24h</div>
+          <div className="mt-4 text-[10px] text-gold-dim text-center">
+            Powered by Google Places · Results cached 24h
+          </div>
         </>
       )}
     </Modal>
@@ -3467,17 +3530,18 @@ function MoodDuaModal({ moodKey, onClose }) {
    GUIDED PRAYER — step-by-step with auto-play mode
    ============================================================ */
 
-// Beautifully recited audio for key prayer steps (hosted MP3s, no TTS needed)
-// Sources: al-hamdoulillah.com (Sahih al-Bukhari #831), quranclick.com, everyayah.com
+// Beautifully recited audio for key prayer steps — served from local public/audio/prayer/
+// Files to place: tashahhud.mp3, durood.mp3, ibrahim40.mp3, ibrahim41.mp3
+// Format: MP3, 128–192kbps, mono or stereo both fine
 const STEP_AUDIO = {
-  // At-Tahiyyat (Tashahhud) — 21s — from al-hamdoulillah.com (Sahih al-Bukhari #831)
-  tashahhud: 'https://www.al-hamdoulillah.com/invocations/mp3/52.mp3',
-  // Durood Ibrahim (complete) — beautifully recited
-  durood: 'https://www.quranclick.com/Downloads/Duain/Darood-e-Ibrahimi.mp3',
-  // Surah Ibrahim 14:40 — Mishary Alafasy 128kbps
-  ibrahim40: 'https://everyayah.com/data/Alafasy_128kbps/014040.mp3',
-  // Surah Ibrahim 14:41 — Mishary Alafasy 128kbps
-  ibrahim41: 'https://everyayah.com/data/Alafasy_128kbps/014041.mp3',
+  // At-Tahiyyat (Tashahhud) — save as public/audio/prayer/tashahhud.mp3
+  tashahhud: '/audio/prayer/tashahhud.mp3',
+  // Durood Ibrahim (complete) — save as public/audio/prayer/durood.mp3
+  durood: '/audio/prayer/durood.mp3',
+  // Surah Ibrahim 14:40 (Alafasy) — save as public/audio/prayer/ibrahim40.mp3
+  ibrahim40: '/audio/prayer/ibrahim40.mp3',
+  // Surah Ibrahim 14:41 (Alafasy) — save as public/audio/prayer/ibrahim41.mp3
+  ibrahim41: '/audio/prayer/ibrahim41.mp3',
 };
 
 // Sequential audio files for the Final Tashahhud + Durood + Dua step.
@@ -3510,6 +3574,7 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
   // Multi-track state for Tashahhud + Durood + Dua sequential playback
   const [multiTrackIdx, setMultiTrackIdx] = useState(0);
   const [multiTrackLabel, setMultiTrackLabel] = useState('');
+  const [audioUnavailable, setAudioUnavailable] = useState(false);
 
   const autoWakeLockRef = useRef(null);
   const autoStepTimerRef = useRef(null);
@@ -3837,41 +3902,54 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
     audioRef.current.onended = () => {
       setTimeout(() => playMultiTrackManual(trackIdx + 1), 600);
     };
-    audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+    audioRef.current.onerror = () => {
+      setIsPlaying(false);
+      setAudioUnavailable(true);
+    };
+    audioRef.current.play()
+      .then(() => { setIsPlaying(true); setAudioUnavailable(false); })
+      .catch(() => { setIsPlaying(false); setAudioUnavailable(true); });
   }
 
   function togglePlay() {
     if (isPlaying) {
       audioRef.current?.pause();
-      if (audioRef.current) audioRef.current.onended = null;
+      if (audioRef.current) { audioRef.current.onended = null; audioRef.current.onerror = null; }
       setIsPlaying(false);
       setMultiTrackLabel('');
     } else if (step.multiAudio && audioRef.current) {
+      setAudioUnavailable(false);
       playMultiTrackManual(0);
     } else if (step.audio && audioRef.current) {
+      setAudioUnavailable(false);
       audioRef.current.src = step.audio;
       audioRef.current.playbackRate = speed;
-      audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+      audioRef.current.onerror = () => { setIsPlaying(false); setAudioUnavailable(true); };
+      audioRef.current.play()
+        .then(() => { setIsPlaying(true); setAudioUnavailable(false); })
+        .catch(() => { setIsPlaying(false); setAudioUnavailable(true); });
     }
   }
 
   function next() {
     audioRef.current?.pause();
-    if (audioRef.current) audioRef.current.onended = null;
+    if (audioRef.current) { audioRef.current.onended = null; audioRef.current.onerror = null; }
     setIsPlaying(false);
     setMultiTrackLabel('');
     setMultiTrackIdx(0);
     multiTrackIdxRef.current = 0;
+    setAudioUnavailable(false);
     setCurrentStep(Math.min(currentStep + 1, steps.length - 1));
   }
 
   function prev() {
     audioRef.current?.pause();
-    if (audioRef.current) audioRef.current.onended = null;
+    if (audioRef.current) { audioRef.current.onended = null; audioRef.current.onerror = null; }
     setIsPlaying(false);
     setMultiTrackLabel('');
     setMultiTrackIdx(0);
     multiTrackIdxRef.current = 0;
+    setAudioUnavailable(false);
     setCurrentStep(Math.max(currentStep - 1, 0));
   }
 
@@ -4036,9 +4114,14 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
                   {multiTrackLabel && <div className="text-xs text-gold-dim italic">{multiTrackLabel}</div>}
                 </div>
               )}
-              {step.multiAudio && !isPlaying && (
+              {step.multiAudio && !isPlaying && !audioUnavailable && (
                 <div className="mt-2 text-[10px] text-gold-dim italic">
                   Plays: At-Tahiyyat → Durood Ibrahim → Dua (Ibrahim 14:40–41) — beautifully recited
+                </div>
+              )}
+              {audioUnavailable && (
+                <div className="mt-2 px-3 py-2 rounded-sm border border-amber-500/40 bg-amber-900/20 text-amber-300 text-xs">
+                  Audio unavailable — audio file not yet added. Add MP3 to <code>public/audio/prayer/</code> and refresh.
                 </div>
               )}
             </div>

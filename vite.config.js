@@ -55,6 +55,15 @@ export default defineConfig({
               expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 30 },
             },
           },
+          {
+            // Cache local audio files from /audio/
+            urlPattern: /\/audio\/.*\.mp3$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'local-audio-cache',
+              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 90 },
+            },
+          },
         ],
       },
     }),
