@@ -3040,7 +3040,7 @@ function TodaysReflection() {
   const hadith = FORTY_HADITH[(dayOfYear - 1) % FORTY_HADITH.length];
 
   useEffect(() => {
-    if (verseDateKey !== todayKey || !verse) {
+    if (verseDateKey !== todayKey || !verse || !verse.english) {
       fetchVerse();
     }
   }, []); // eslint-disable-line
