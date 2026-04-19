@@ -441,6 +441,7 @@ export default function App() {
   const [openMood, setOpenMood] = useState(null);
   const [openIstikharah, setOpenIstikharah] = useState(false);
   const [openGuided, setOpenGuided] = useState(false);
+  const [openQibla, setOpenQibla] = useState(false);
   const [guidedRakats, setGuidedRakats] = useState(2);
 
   const adhanAudioRef = useRef(null);
@@ -779,27 +780,37 @@ export default function App() {
             <div className="ornament mb-10"></div>
 
             {/* Action cards */}
-            <div className="grid md:grid-cols-3 gap-4 mb-10">
+            <div className="grid md:grid-cols-3 gap-4 mb-4">
               <button onClick={() => setOpenGuided(true)}
                 className="p-6 rounded-sm border gold-border text-left hover:bg-gold/5 transition">
                 <Headphones className="w-8 h-8 gold-text mb-3" />
                 <div className="font-display text-2xl mb-1">Guided Prayer</div>
                 <div className="text-xs text-gold-dim">Walk through 2, 3, or 4 rakats with a reciter of your choice.</div>
               </button>
-
               <button onClick={() => setOpenIstikharah(true)}
                 className="p-6 rounded-sm border gold-border text-left hover:bg-gold/5 transition">
                 <Compass className="w-8 h-8 gold-text mb-3" />
                 <div className="font-display text-2xl mb-1">Istikharah</div>
                 <div className="text-xs text-gold-dim">Seeking counsel from Allah for a decision you are facing.</div>
               </button>
-
               <button onClick={() => isAdhanPlaying ? stopAdhan() : playAdhan(ADHAN_LIBRARY[adhanIndex].url)}
                 className="p-6 rounded-sm border gold-border text-left hover:bg-gold/5 transition">
                 {isAdhanPlaying ? <Pause className="w-8 h-8 gold-text mb-3" /> : <Play className="w-8 h-8 gold-text mb-3" />}
                 <div className="font-display text-2xl mb-1">Preview Adhan</div>
                 <div className="text-xs text-gold-dim">{ADHAN_LIBRARY[adhanIndex].name}</div>
               </button>
+            </div>
+
+            <div className="mb-10">
+              <h2 className="font-display text-2xl mb-4 gold-text tracking-wide">Tools</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <button onClick={() => setOpenQibla(true)}
+                  className="p-5 rounded-sm border gold-border text-left hover:bg-gold/5 transition">
+                  <div className="text-2xl mb-2">🧭</div>
+                  <div className="font-display text-lg mb-1">Qibla</div>
+                  <div className="text-xs text-gold-dim">Direction of prayer</div>
+                </button>
+              </div>
             </div>
 
             {/* Mood section */}
@@ -920,6 +931,10 @@ export default function App() {
           />
         )}
 
+        {openQibla && (
+          <QiblaCompass location={location} onClose={() => setOpenQibla(false)} />
+        )}
+
         {/* Settings modal */}
         {showSettings && (
           <Modal onClose={() => setShowSettings(false)}>
@@ -986,6 +1001,180 @@ function Modal({ children, onClose }) {
         {children}
       </div>
     </div>
+  );
+}
+
+/* ============================================================
+   QIBLA COMPASS
+   ============================================================ */
+
+function haversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function calcQiblaAngle(lat, lon) {
+  const kaabaLat = 21.4225;
+  const kaabaLon = 39.8262;
+  const dLon = (kaabaLon - lon) * Math.PI / 180;
+  const latRad = lat * Math.PI / 180;
+  const kaabaLatRad = kaabaLat * Math.PI / 180;
+  const y = Math.sin(dLon);
+  const x = Math.cos(latRad) * Math.tan(kaabaLatRad) - Math.sin(latRad) * Math.cos(dLon);
+  const angle = Math.atan2(y, x) * 180 / Math.PI;
+  return (angle + 360) % 360;
+}
+
+function QiblaCompass({ location, onClose }) {
+  const [compassHeading, setCompassHeading] = useState(null);
+  const [permissionState, setPermissionState] = useState('idle'); // idle | requesting | granted | denied | unsupported
+  const [orientationSupported, setOrientationSupported] = useState(false);
+
+  const qiblaAngle = location ? calcQiblaAngle(location.lat, location.lon) : 0;
+  const distanceKm = location ? haversineDistance(location.lat, location.lon, 21.4225, 39.8262) : 0;
+
+  const needleRotation = compassHeading !== null ? (qiblaAngle - compassHeading + 360) % 360 : qiblaAngle;
+
+  useEffect(() => {
+    if (typeof DeviceOrientationEvent === 'undefined') {
+      setOrientationSupported(false);
+      return;
+    }
+    setOrientationSupported(true);
+  }, []);
+
+  async function requestOrientation() {
+    setPermissionState('requesting');
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      try {
+        const perm = await DeviceOrientationEvent.requestPermission();
+        if (perm === 'granted') {
+          setPermissionState('granted');
+          startListening();
+        } else {
+          setPermissionState('denied');
+        }
+      } catch {
+        setPermissionState('denied');
+      }
+    } else {
+      setPermissionState('granted');
+      startListening();
+    }
+  }
+
+  function startListening() {
+    window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+    window.addEventListener('deviceorientation', handleOrientation, true);
+  }
+
+  function handleOrientation(e) {
+    let heading = null;
+    if (e.webkitCompassHeading !== undefined) {
+      heading = e.webkitCompassHeading;
+    } else if (e.absolute && e.alpha !== null) {
+      heading = (360 - e.alpha) % 360;
+    } else if (e.alpha !== null) {
+      heading = (360 - e.alpha) % 360;
+    }
+    if (heading !== null) setCompassHeading(heading);
+  }
+
+  useEffect(() => {
+    return () => {
+      window.removeEventListener('deviceorientationabsolute', handleOrientation, true);
+      window.removeEventListener('deviceorientation', handleOrientation, true);
+    };
+  }, []); // eslint-disable-line
+
+  return (
+    <Modal onClose={onClose}>
+      <div className="flex items-center gap-3 mb-6">
+        <div className="text-3xl">🧭</div>
+        <div>
+          <div className="font-display text-3xl">Qibla Direction</div>
+          <div className="text-xs text-gold-dim">Direction of the Kaaba, Makkah</div>
+        </div>
+      </div>
+
+      <div className="text-center mb-6 p-3 rounded-sm border border-gold/20 bg-gold/5">
+        <div className="text-xs uppercase tracking-widest gold-text mb-1">Distance to Kaaba</div>
+        <div className="font-display text-2xl">{distanceKm.toFixed(0)} km · {(distanceKm * 0.621371).toFixed(0)} mi</div>
+        <div className="text-xs text-gold-dim mt-1">from {location?.city}</div>
+      </div>
+
+      <div className="flex justify-center mb-6">
+        <svg viewBox="0 0 200 200" width="220" height="220" className="mx-auto">
+          <circle cx="100" cy="100" r="95" fill="none" stroke="rgba(212,175,55,0.3)" strokeWidth="2" />
+          <circle cx="100" cy="100" r="85" fill="rgba(212,175,55,0.04)" stroke="rgba(212,175,55,0.15)" strokeWidth="1" />
+          <text x="100" y="18" textAnchor="middle" fill="#d4af37" fontSize="12" fontFamily="Outfit,sans-serif" fontWeight="600">N</text>
+          <text x="188" y="104" textAnchor="middle" fill="rgba(212,175,55,0.6)" fontSize="11" fontFamily="Outfit,sans-serif">E</text>
+          <text x="100" y="196" textAnchor="middle" fill="rgba(212,175,55,0.6)" fontSize="11" fontFamily="Outfit,sans-serif">S</text>
+          <text x="12" y="104" textAnchor="middle" fill="rgba(212,175,55,0.6)" fontSize="11" fontFamily="Outfit,sans-serif">W</text>
+          {Array.from({length: 36}, (_, i) => {
+            const angle = i * 10 * Math.PI / 180;
+            const isMajor = i % 9 === 0;
+            const r1 = isMajor ? 82 : 86;
+            const r2 = 90;
+            return (
+              <line key={i}
+                x1={100 + r1*Math.sin(angle)} y1={100 - r1*Math.cos(angle)}
+                x2={100 + r2*Math.sin(angle)} y2={100 - r2*Math.cos(angle)}
+                stroke={isMajor ? "rgba(212,175,55,0.5)" : "rgba(212,175,55,0.2)"} strokeWidth={isMajor ? 1.5 : 0.8} />
+            );
+          })}
+          <g transform={`rotate(${needleRotation}, 100, 100)`} style={{ transition: compassHeading !== null ? 'transform 0.3s ease' : 'none' }}>
+            <polygon points="100,25 106,100 100,110 94,100" fill="#d4af37" opacity="0.95" />
+            <polygon points="100,175 106,100 100,110 94,100" fill="rgba(212,175,55,0.2)" />
+            <circle cx="100" cy="100" r="6" fill="#d4af37" />
+            <circle cx="100" cy="100" r="3" fill="#0a1628" />
+          </g>
+          <g transform={`rotate(${needleRotation}, 100, 100)`}>
+            <rect x="88" y="10" width="24" height="14" rx="2" fill="#0a1628" stroke="#d4af37" strokeWidth="1.5" />
+            <rect x="93" y="13" width="14" height="11" rx="1" fill="#1a2744" stroke="rgba(212,175,55,0.5)" strokeWidth="0.8" />
+            <text x="100" y="21.5" textAnchor="middle" fontSize="6" fill="#d4af37" fontFamily="serif">الكعبة</text>
+          </g>
+        </svg>
+      </div>
+
+      <div className="text-center mb-6">
+        <div className="font-display text-4xl gold-text">{Math.round(qiblaAngle)}°</div>
+        <div className="text-sm text-gold-dim">from North (clockwise)</div>
+      </div>
+
+      {orientationSupported && permissionState === 'idle' && (
+        <button onClick={requestOrientation}
+          className="w-full py-3 rounded-sm border-2 border-gold bg-gold/10 hover:bg-gold/20 transition font-semibold gold-text mb-4">
+          Enable Live Compass (rotate phone)
+        </button>
+      )}
+      {permissionState === 'requesting' && (
+        <div className="text-center text-sm text-gold-dim mb-4">Requesting compass permission...</div>
+      )}
+      {permissionState === 'granted' && compassHeading !== null && (
+        <div className="text-center p-3 rounded-sm border border-gold/30 bg-gold/5 mb-4">
+          <div className="text-xs uppercase tracking-widest gold-text mb-1">Live Compass Active</div>
+          <div className="text-sm">Device heading: {Math.round(compassHeading)}° · Qibla: {Math.round(qiblaAngle)}°</div>
+        </div>
+      )}
+      {permissionState === 'denied' && (
+        <div className="text-center text-sm text-gold-dim mb-4">
+          Compass permission denied. The needle shows the static Qibla bearing from North.
+        </div>
+      )}
+      {!orientationSupported && (
+        <div className="text-center text-xs text-gold-dim mb-4">
+          Device orientation not available on this device. The compass shows the calculated Qibla bearing from North.
+        </div>
+      )}
+
+      <div className="text-[10px] text-gold-dim text-center italic mt-2">
+        Qibla direction calculated using haversine formula from your location to the Kaaba, Makkah (21.4225°N, 39.8262°E).
+      </div>
+    </Modal>
   );
 }
 
