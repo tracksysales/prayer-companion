@@ -486,6 +486,7 @@ export default function App() {
   const [openGuided, setOpenGuided] = useState(false);
   const [openQibla, setOpenQibla] = useState(false);
   const [openTasbih, setOpenTasbih] = useState(false);
+  const [openAdhkar, setOpenAdhkar] = useState(null); // 'morning' | 'evening' | null
   const [guidedRakats, setGuidedRakats] = useState(2);
 
   const adhanAudioRef = useRef(null);
@@ -863,6 +864,18 @@ export default function App() {
                   <div className="font-display text-lg mb-1">Tasbih</div>
                   <div className="text-xs text-gold-dim">Dhikr counter</div>
                 </button>
+                <button onClick={() => setOpenAdhkar('morning')}
+                  className="p-5 rounded-sm border gold-border text-left hover:bg-gold/5 transition">
+                  <div className="text-2xl mb-2">🌅</div>
+                  <div className="font-display text-lg mb-1">Morning Adhkar</div>
+                  <div className="text-xs text-gold-dim">After Fajr</div>
+                </button>
+                <button onClick={() => setOpenAdhkar('evening')}
+                  className="p-5 rounded-sm border gold-border text-left hover:bg-gold/5 transition">
+                  <div className="text-2xl mb-2">🌆</div>
+                  <div className="font-display text-lg mb-1">Evening Adhkar</div>
+                  <div className="text-xs text-gold-dim">After Asr</div>
+                </button>
               </div>
             </div>
 
@@ -992,6 +1005,10 @@ export default function App() {
           <TasbihCounter onClose={() => setOpenTasbih(false)} times={times} />
         )}
 
+        {openAdhkar && (
+          <AdhkarModal mode={openAdhkar} onClose={() => setOpenAdhkar(null)} />
+        )}
+
         {/* Settings modal */}
         {showSettings && (
           <Modal onClose={() => setShowSettings(false)}>
@@ -1083,6 +1100,303 @@ function calcQiblaAngle(lat, lon) {
   const x = Math.cos(latRad) * Math.tan(kaabaLatRad) - Math.sin(latRad) * Math.cos(dLon);
   const angle = Math.atan2(y, x) * 180 / Math.PI;
   return (angle + 360) % 360;
+}
+
+/* ============================================================
+   ADHKAR — Morning and Evening Remembrance (from Hisn al-Muslim)
+   ============================================================ */
+
+const MORNING_ADHKAR = [
+  {
+    id: 'ayat-kursi',
+    arabic: 'اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ۚ لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ ۚ لَهُ مَا فِي السَّمَاوَاتِ وَمَا فِي الْأَرْضِ',
+    translit: 'Allahu la ilaha illa huwal-Hayyul-Qayyum, la ta\'khudhuhu sinatun wa la nawm...',
+    english: 'Ayat al-Kursi (Quran 2:255) — Allah! There is no deity except Him, the Ever-Living, the Sustainer of existence. Neither drowsiness overtakes Him nor sleep...',
+    count: 1,
+    source: 'Hisn al-Muslim #7 — "Whoever recites this in the morning will be protected from jinn until evening" (Abu Dawud 3895)',
+  },
+  {
+    id: 'three-quls',
+    arabic: 'قُلْ هُوَ اللَّهُ أَحَدٌ — قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ — قُلْ أَعُوذُ بِرَبِّ النَّاسِ',
+    translit: 'Qul huwa Allahu ahad (Al-Ikhlas) · Qul a\'udhu bi-rabb il-falaq (Al-Falaq) · Qul a\'udhu bi-rabb in-nas (An-Nas)',
+    english: 'Al-Ikhlas, Al-Falaq, and An-Nas — The three Quls. Each recited 3 times.',
+    count: 3,
+    source: 'Hisn al-Muslim #8 — recited 3 times each morning and evening (Abu Dawud 5082)',
+  },
+  {
+    id: 'sayyid-istighfar',
+    arabic: 'اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ، وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ',
+    translit: 'Allahumma anta rabbi la ilaha illa ant, khalaqtani wa ana \'abduk, wa ana \'ala \'ahdika wa wa\'dika mastata\'t...',
+    english: 'Sayyid al-Istighfar — O Allah, You are my Lord. There is no deity except You. You created me and I am Your servant, and I abide by Your covenant and promise as best I can...',
+    count: 1,
+    source: 'Hisn al-Muslim #11 — "Whoever says this with certainty in the morning and dies that day will enter Paradise" (Bukhari 6306)',
+  },
+  {
+    id: 'subhan-100',
+    arabic: 'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ',
+    translit: 'SubhanAllahi wa bihamdihi',
+    english: 'Glory be to Allah and praise be to Him. Said 100 times — sins are forgiven even if they were like the foam of the sea.',
+    count: 100,
+    source: 'Hisn al-Muslim #12 — (Bukhari 6405, Muslim 2691)',
+  },
+  {
+    id: 'asbahna',
+    arabic: 'أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ',
+    translit: 'Asbahna wa asbahal-mulku lillah, walhamdu lillah, la ilaha illallahu wahdahu la sharika lah...',
+    english: 'We have entered the morning and the entire dominion belongs to Allah. Praise be to Allah. There is no deity except Allah, alone without partner...',
+    count: 1,
+    source: 'Hisn al-Muslim #23 — (Abu Dawud 5077)',
+  },
+  {
+    id: 'hasbiyallah-morning',
+    arabic: 'حَسْبِيَ اللَّهُ لَا إِلَهَ إِلَّا هُوَ عَلَيْهِ تَوَكَّلْتُ وَهُوَ رَبُّ الْعَرْشِ الْعَظِيمِ',
+    translit: 'Hasbiyallahu la ilaha illa huwa, \'alayhi tawakkaltu wa huwa rabbul-\'arshil-\'azeem',
+    english: 'Allah is sufficient for me. There is no deity except Him. Upon Him I rely, and He is the Lord of the Mighty Throne. Recited 7 times.',
+    count: 7,
+    source: 'Hisn al-Muslim #14 — "Allah will be sufficient for him in what concerns him" (Abu Dawud 5081)',
+  },
+  {
+    id: 'la-ilaha-morning',
+    arabic: 'لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ، وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ',
+    translit: 'La ilaha illallahu wahdahu la sharika lah, lahul-mulku wa lahul-hamd, wa huwa \'ala kulli shay\'in qadir',
+    english: 'There is no deity except Allah, alone, without partner. His is the dominion and His is the praise, and He has power over all things. Recited 10 times.',
+    count: 10,
+    source: 'Hisn al-Muslim #16 — "Equivalent to freeing 4 slaves, 10 good deeds recorded, 10 sins erased" (Tirmidhi 3468)',
+  },
+  {
+    id: 'allahumma-aafinee',
+    arabic: 'اللَّهُمَّ عَافِنِي فِي بَدَنِي، اللَّهُمَّ عَافِنِي فِي سَمْعِي، اللَّهُمَّ عَافِنِي فِي بَصَرِي',
+    translit: 'Allahumma \'afini fi badani, Allahumma \'afini fi sam\'i, Allahumma \'afini fi basari',
+    english: 'O Allah, grant me health in my body. O Allah, grant me health in my hearing. O Allah, grant me health in my sight. Recited 3 times.',
+    count: 3,
+    source: 'Hisn al-Muslim #22 — (Abu Dawud 5090)',
+  },
+  {
+    id: 'ridha-morning',
+    arabic: 'رَضِيتُ بِاللَّهِ رَبًّا، وَبِالإِسْلَامِ دِيناً، وَبِمُحَمَّدٍ صَلَّى اللَّهُ عَلَيهِ وَسَلَّم نَبِيًّا',
+    translit: 'Raditu billahi rabba, wa bil-islami dina, wa bi-Muhammadin sallallahu \'alayhi wa sallam nabiyya',
+    english: 'I am pleased with Allah as my Lord, Islam as my religion, and Muhammad as my prophet. Recited 3 times.',
+    count: 3,
+    source: 'Hisn al-Muslim #9 — "Allah will be pleased with him on the Day of Judgment" (Abu Dawud 5072, Tirmidhi 3389)',
+  },
+  {
+    id: 'salawat-morning',
+    arabic: 'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
+    translit: 'Allahumma salli wa sallim \'ala nabiyyina Muhammad',
+    english: 'O Allah, send blessings and peace upon our Prophet Muhammad. Recited 10 times.',
+    count: 10,
+    source: 'Hisn al-Muslim — (Authenticated by al-Albani)',
+  },
+];
+
+const EVENING_ADHKAR = [
+  {
+    id: 'ayat-kursi-eve',
+    arabic: 'اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ',
+    translit: 'Allahu la ilaha illa huwal-Hayyul-Qayyum...',
+    english: 'Ayat al-Kursi (Quran 2:255) — Protection from jinn until the morning. Recited once.',
+    count: 1,
+    source: 'Hisn al-Muslim #7 — (Abu Dawud 3895)',
+  },
+  {
+    id: 'three-quls-eve',
+    arabic: 'قُلْ هُوَ اللَّهُ أَحَدٌ — قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ — قُلْ أَعُوذُ بِرَبِّ النَّاسِ',
+    translit: 'Qul huwa Allahu ahad · Qul a\'udhu bi-rabb il-falaq · Qul a\'udhu bi-rabb in-nas',
+    english: 'Al-Ikhlas, Al-Falaq, An-Nas — The three Quls. Recited 3 times each evening.',
+    count: 3,
+    source: 'Hisn al-Muslim #8 — (Abu Dawud 5082)',
+  },
+  {
+    id: 'amsayna',
+    arabic: 'أَمْسَيْنَا وَأَمْسَى الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ',
+    translit: 'Amsayna wa amsal-mulku lillah, walhamdu lillah, la ilaha illallahu wahdahu la sharika lah...',
+    english: 'We have entered the evening and the entire dominion belongs to Allah. Praise be to Allah. There is no deity except Allah, alone without partner...',
+    count: 1,
+    source: 'Hisn al-Muslim #23 — (Abu Dawud 5077)',
+  },
+  {
+    id: 'sayyid-eve',
+    arabic: 'اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ',
+    translit: 'Allahumma anta rabbi la ilaha illa ant, khalaqtani wa ana \'abduk...',
+    english: 'Sayyid al-Istighfar — O Allah, You are my Lord. There is no deity except You. You created me and I am Your servant...',
+    count: 1,
+    source: 'Hisn al-Muslim #11 — "Whoever says this in the evening with certainty and dies that night will enter Paradise" (Bukhari 6306)',
+  },
+  {
+    id: 'allahumma-ma-amsa',
+    arabic: 'اللَّهُمَّ مَا أَمْسَى بِي مِنْ نِعْمَةٍ أَوْ بِأَحَدٍ مِنْ خَلْقِكَ فَمِنْكَ وَحْدَكَ لَا شَرِيكَ لَكَ',
+    translit: 'Allahumma ma amsa bi min ni\'matin aw bi-ahadin min khalqika fa-minka wahdaka la sharika lak...',
+    english: 'O Allah, whatever blessing I or any of Your creation have received in the evening, it is from You alone, without partner. All praise and thanks are Yours.',
+    count: 1,
+    source: 'Hisn al-Muslim #24 — "Whoever says this in the evening has expressed gratitude for the day" (Abu Dawud 5073)',
+  },
+  {
+    id: 'hasbiyallah-evening',
+    arabic: 'حَسْبِيَ اللَّهُ لَا إِلَهَ إِلَّا هُوَ عَلَيْهِ تَوَكَّلْتُ وَهُوَ رَبُّ الْعَرْشِ الْعَظِيمِ',
+    translit: 'Hasbiyallahu la ilaha illa huwa, \'alayhi tawakkaltu wa huwa rabbul-\'arshil-\'azeem',
+    english: 'Allah is sufficient for me. There is no deity except Him. Upon Him I rely. Recited 7 times.',
+    count: 7,
+    source: 'Hisn al-Muslim #14 — (Abu Dawud 5081)',
+  },
+  {
+    id: 'subhan-100-eve',
+    arabic: 'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ',
+    translit: 'SubhanAllahi wa bihamdihi',
+    english: 'Glory be to Allah and praise be to Him. Recited 100 times — sins forgiven even if like the foam of the sea.',
+    count: 100,
+    source: 'Hisn al-Muslim #12 — (Bukhari 6405)',
+  },
+  {
+    id: 'before-sleep',
+    arabic: 'بِاسْمِكَ رَبِّي وَضَعْتُ جَنْبِي، وَبِكَ أَرْفَعُهُ، فَإِنْ أَمْسَكْتَ نَفْسِي فَارْحَمْهَا، وَإِنْ أَرْسَلْتَهَا فَاحْفَظْهَا بِمَا تَحْفَظُ بِهِ عِبَادَكَ الصَّالِحِينَ',
+    translit: 'Bismika rabbi wada\'tu janbi, wa bika arfa\'uh, fa-in amsakta nafsi farhamha, wa in arsaltaha fahfazha bima tahfazu bihi \'ibadakas-salihin',
+    english: 'In Your name, my Lord, I lay myself down; and in Your name, I rise. If You take my soul, have mercy on it; and if You release it, protect it as You protect Your righteous servants.',
+    count: 1,
+    source: 'Hisn al-Muslim #101 — Before sleep (Bukhari 6320)',
+  },
+  {
+    id: 'kafirun-sleep',
+    arabic: 'قُلْ يَا أَيُّهَا الْكَافِرُونَ',
+    translit: 'Qul ya ayyuhal-kafirun (Surah Al-Kafirun, full)',
+    english: 'Recite Surah Al-Kafirun once — it is a declaration of freedom from shirk and brings protection at sleep.',
+    count: 1,
+    source: 'Hisn al-Muslim #102 — (Abu Dawud 5055, Tirmidhi 3403)',
+  },
+  {
+    id: 'la-ilaha-evening',
+    arabic: 'لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ',
+    translit: 'La ilaha illallahu wahdahu la sharika lah, lahul-mulku wa lahul-hamd, wa huwa \'ala kulli shay\'in qadir',
+    english: 'There is no deity except Allah, alone, without partner. His is the dominion, His is the praise, and He has power over all things. Recited 10 times.',
+    count: 10,
+    source: 'Hisn al-Muslim #16 — (Tirmidhi 3468)',
+  },
+];
+
+function AdhkarModal({ mode, onClose }) {
+  const todayKey = new Date().toISOString().split('T')[0];
+  const adhkar = mode === 'morning' ? MORNING_ADHKAR : EVENING_ADHKAR;
+  const [step, setStep] = useState(0);
+  const [tapCount, setTapCount] = useState(0);
+  const [completedToday, setCompletedToday] = useLocalStorage(`pc_adhkar_${mode}_${todayKey}`, false);
+
+  const current = adhkar[step];
+  const isLastStep = step === adhkar.length - 1;
+  const stepProgress = tapCount / current.count;
+  const stepDone = tapCount >= current.count;
+
+  function tap() {
+    if (navigator.vibrate) navigator.vibrate(20);
+    setTapCount(c => Math.min(c + 1, current.count));
+  }
+
+  function advance() {
+    if (isLastStep) {
+      setCompletedToday(true);
+      onClose();
+    } else {
+      setStep(s => s + 1);
+      setTapCount(0);
+    }
+  }
+
+  function skipStep() {
+    advance();
+  }
+
+  return (
+    <Modal onClose={onClose}>
+      <div className="flex items-center gap-3 mb-2">
+        <div className="text-3xl">{mode === 'morning' ? '🌅' : '🌆'}</div>
+        <div>
+          <div className="font-display text-3xl">{mode === 'morning' ? 'Morning Adhkar' : 'Evening Adhkar'}</div>
+          <div className="text-xs text-gold-dim">
+            {mode === 'morning' ? 'Adhkar al-Sabah — Recited after Fajr until sunrise' : 'Adhkar al-Masa — Recited after Asr until Maghrib'}
+          </div>
+        </div>
+      </div>
+
+      {completedToday && (
+        <div className="mb-4 p-3 rounded-sm border border-gold/40 bg-gold/10 text-center text-sm gold-text">
+          Completed today · Mashallah!
+        </div>
+      )}
+
+      {/* Progress bar */}
+      <div className="mb-4">
+        <div className="flex justify-between text-xs text-gold-dim mb-1">
+          <span>Dhikr {step + 1} of {adhkar.length}</span>
+          <span>{Math.round((step / adhkar.length) * 100)}% of set complete</span>
+        </div>
+        <div className="h-1.5 rounded bg-gold/10 overflow-hidden">
+          <div className="h-full bg-gold transition-all" style={{ width: `${((step) / adhkar.length) * 100}%` }}></div>
+        </div>
+      </div>
+
+      {/* Current dhikr card */}
+      <div className="p-5 rounded-sm border gold-border mb-4" style={{ background: 'rgba(212,175,55,0.04)' }}>
+        <div className="font-arabic text-2xl gold-text leading-loose mb-3">{current.arabic}</div>
+        <div className="text-sm text-gold-dim italic mb-2">{current.translit}</div>
+        <div className="text-sm leading-relaxed mb-3">{current.english}</div>
+        <div className="text-[10px] text-gold-dim">{current.source}</div>
+      </div>
+
+      {/* TTS button */}
+      {hasSpeechSynthesis && (
+        <button onClick={() => speakArabic(current.arabic)}
+          className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-sm border gold-border hover:bg-gold/10 transition gold-text mb-4">
+          Hear Arabic
+        </button>
+      )}
+
+      {/* Count target */}
+      <div className="text-center mb-4">
+        <div className="text-xs uppercase tracking-widest gold-text mb-1">
+          {current.count === 1 ? 'Recite once' : `Recite ${current.count} times`}
+        </div>
+
+        {current.count > 1 && (
+          <>
+            {/* SVG progress ring */}
+            <div className="flex justify-center mb-3">
+              <div className="relative" style={{ width: 100, height: 100 }}>
+                <svg width="100" height="100" className="absolute inset-0" style={{ transform: 'rotate(-90deg)' }}>
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(212,175,55,0.15)" strokeWidth="6" />
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#d4af37"
+                    strokeWidth="6" strokeLinecap="round"
+                    strokeDasharray={2 * Math.PI * 40}
+                    strokeDashoffset={2 * Math.PI * 40 * (1 - stepProgress)}
+                    style={{ transition: 'stroke-dashoffset 0.2s ease' }} />
+                </svg>
+                <button onClick={tap}
+                  disabled={stepDone}
+                  className={`absolute inset-2 rounded-full flex items-center justify-center transition ${stepDone ? 'bg-gold' : 'bg-gold/10 hover:bg-gold/25 active:scale-95'}`}>
+                  <span className={`font-display text-2xl tabular-nums ${stepDone ? 'text-midnight' : 'gold-text'}`}>{tapCount}</span>
+                </button>
+              </div>
+            </div>
+            <div className="text-xs text-gold-dim">{tapCount} / {current.count}</div>
+          </>
+        )}
+      </div>
+
+      {/* Navigation */}
+      <div className="flex gap-2 mt-4">
+        <button onClick={skipStep}
+          className="flex-1 py-2.5 rounded-sm border gold-border hover:bg-gold/10 transition text-sm">
+          Skip
+        </button>
+        <button onClick={advance}
+          disabled={!stepDone && current.count > 1}
+          className="flex-1 py-2.5 rounded-sm bg-gold text-midnight font-semibold hover:bg-gold-bright transition disabled:opacity-40 disabled:cursor-not-allowed text-sm">
+          {isLastStep ? 'Complete Set' : 'Next'}
+        </button>
+      </div>
+
+      {current.count === 1 && (
+        <div className="text-center mt-2 text-xs text-gold-dim">Tap Next when ready</div>
+      )}
+    </Modal>
+  );
 }
 
 function QiblaCompass({ location, onClose }) {
