@@ -922,10 +922,14 @@ export default function App() {
                   <div className="text-xs text-gold-dim">Step-by-step purification</div>
                 </button>
                 <button onClick={() => setOpenChatbot(true)}
-                  className="p-5 rounded-sm border gold-border text-left hover:bg-gold/5 transition">
-                  <div className="text-2xl mb-2">💬</div>
-                  <div className="font-display text-lg mb-1">Ask About Islam</div>
-                  <div className="text-xs text-gold-dim">AI-powered Q&A</div>
+                  className="p-5 rounded-sm border gold-border text-left hover:bg-gold/5 transition relative overflow-hidden">
+                  <div className="flex items-center gap-3">
+                    <Yusuf state="waving" size="sm" aria-hidden="true" />
+                    <div>
+                      <div className="font-display text-lg mb-1">Ask Yusuf</div>
+                      <div className="text-xs text-gold-dim">Got a question about Islam? Tap to ask!</div>
+                    </div>
+                  </div>
                 </button>
               </div>
             </div>
@@ -1895,6 +1899,73 @@ const STARTERS = [
   'What are the etiquettes of making dua?',
 ];
 
+/* Yusuf character component */
+function Yusuf({ state = 'waving', size = 'md', className = '' }) {
+  const sizes = {
+    sm: 'w-16 h-16',
+    md: 'w-28 h-28',
+    lg: 'w-40 h-40',
+    xl: 'w-56 h-56',
+  };
+  const animClass = state === 'waving' || state === 'happy'
+    ? 'yusuf-idle'
+    : state === 'thinking'
+    ? 'yusuf-thinking'
+    : state === 'speaking'
+    ? 'yusuf-speaking'
+    : '';
+  const src = `/images/yusuf/yusuf-${state}.png`;
+  return (
+    <div className={`relative flex-shrink-0 ${sizes[size]} ${className}`}>
+      <img
+        src={src}
+        alt="Yusuf, your Islamic learning companion"
+        onError={(e) => { e.target.src = '/images/yusuf/yusuf-waving.png'; }}
+        className={`w-full h-full object-contain select-none pointer-events-none ${animClass}`}
+        style={{ filter: 'drop-shadow(0 10px 15px rgba(212, 175, 55, 0.3))' }}
+        draggable={false}
+      />
+    </div>
+  );
+}
+
+/* Speech bubble component */
+function SpeechBubble({ children, tail = 'left', className = '' }) {
+  return (
+    <div
+      className={`relative rounded-2xl px-4 py-3 shadow-lg text-sm ${className}`}
+      style={{
+        maxWidth: '260px',
+        background: '#f5f1e8',
+        color: '#0a1628',
+        border: '1px solid rgba(212,175,55,0.4)',
+      }}
+      role="status"
+      aria-live="polite"
+    >
+      {children}
+      <div
+        className="absolute w-0 h-0"
+        style={tail === 'left' ? {
+          left: '-9px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          borderRight: '9px solid #f5f1e8',
+          borderTop: '7px solid transparent',
+          borderBottom: '7px solid transparent',
+        } : {
+          right: '-9px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          borderLeft: '9px solid #f5f1e8',
+          borderTop: '7px solid transparent',
+          borderBottom: '7px solid transparent',
+        }}
+      />
+    </div>
+  );
+}
+
 function IslamicChatbotModal({ onClose }) {
   const [messages, setMessages] = useState(() => {
     try {
@@ -1905,6 +1976,7 @@ function IslamicChatbotModal({ onClose }) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [yusufState, setYusufState] = useState('waving');
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -1913,6 +1985,31 @@ function IslamicChatbotModal({ onClose }) {
     } catch {}
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Update Yusuf state based on conversation state
+  useEffect(() => {
+    if (loading) {
+      setYusufState('thinking');
+    } else {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg && lastMsg.role === 'assistant' && messages.length > 1) {
+        if (lastMsg.content.length > 500) {
+          setYusufState('reading');
+          const t1 = setTimeout(() => setYusufState('speaking'), 2000);
+          const t2 = setTimeout(() => setYusufState('happy'), 3500);
+          const t3 = setTimeout(() => setYusufState('waving'), 5000);
+          return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+        } else {
+          setYusufState('speaking');
+          const t1 = setTimeout(() => setYusufState('happy'), 1500);
+          const t2 = setTimeout(() => setYusufState('waving'), 3000);
+          return () => { clearTimeout(t1); clearTimeout(t2); };
+        }
+      } else {
+        setYusufState('waving');
+      }
+    }
+  }, [loading, messages]);
 
   const userMessages = messages.filter(m => m.role === 'user');
   const atLimit = userMessages.length >= 20;
@@ -1954,16 +2051,22 @@ function IslamicChatbotModal({ onClose }) {
     setMessages([WELCOME_MSG]);
     setInput('');
     setError(null);
+    setYusufState('waving');
     localStorage.removeItem('pc_chat_history');
   }
 
   function hasArabic(text) { return /[\u0600-\u06FF]/.test(text); }
 
+  const lastAssistantMsg = [...messages].reverse().find(m => m.role === 'assistant');
+  const isWelcomeOnly = messages.length === 1;
+
   return (
     <Modal onClose={onClose}>
-      <div className="flex items-center justify-between mb-4">
+      {/* Header with Yusuf + title */}
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
-          <div className="text-2xl">💬</div>
+          {/* Yusuf header avatar — desktop only */}
+          <Yusuf state={yusufState} size="sm" className="hidden sm:block" aria-hidden="true" />
           <div>
             <div className="font-display text-2xl">Ask About Islam</div>
             <div className="text-xs text-gold-dim">Powered by AI · Not a scholarly ruling</div>
@@ -1974,11 +2077,43 @@ function IslamicChatbotModal({ onClose }) {
         </button>
       </div>
 
+      {/* Welcome area with Yusuf — shown only on first load */}
+      {isWelcomeOnly && (
+        <div className="flex items-start gap-4 mb-4 p-3 rounded-lg" style={{ background: 'rgba(212,175,55,0.04)' }}>
+          <Yusuf state="waving" size="lg" aria-hidden="true" />
+          <div className="flex-1 min-w-0">
+            <SpeechBubble tail="left" className="mb-3">
+              <p className="font-display text-base leading-snug" style={{ color: '#0a1628' }}>
+                Assalamu alaykum! I&apos;m Yusuf — here to help you learn about Islam. Ask me anything about the Quran, Hadith, or Muslim practice.
+              </p>
+            </SpeechBubble>
+            <div className="flex flex-wrap gap-2">
+              {STARTERS.map(s => (
+                <button key={s} onClick={() => send(s)}
+                  className="text-xs px-3 py-1.5 rounded-full border gold-border hover:bg-gold/10 transition gold-text">
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Chat window */}
-      <div className="h-80 overflow-y-auto mb-4 space-y-3 pr-1">
-        {messages.map((m, i) => (
-          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] rounded-sm px-4 py-3 text-sm ${
+      <div className="h-64 overflow-y-auto mb-3 space-y-3 pr-1">
+        {/* Skip welcome msg in transcript — we show it in the welcome area above */}
+        {messages.slice(isWelcomeOnly ? 1 : 0).map((m, i) => (
+          <div key={i} className={`flex items-end gap-2 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            {/* Yusuf avatar next to assistant messages — mobile only */}
+            {m.role === 'assistant' && (
+              <Yusuf
+                state={i === messages.length - 2 ? yusufState : 'waving'}
+                size="sm"
+                className="sm:hidden mb-1 flex-shrink-0"
+                aria-hidden="true"
+              />
+            )}
+            <div className={`max-w-[80%] rounded-sm px-4 py-3 text-sm ${
               m.role === 'user'
                 ? 'bg-gold text-midnight font-medium'
                 : 'border gold-border text-cream'
@@ -1997,8 +2132,8 @@ function IslamicChatbotModal({ onClose }) {
             </div>
           </div>
         ))}
-        {/* Starter chips — only show if only welcome message */}
-        {messages.length === 1 && (
+        {/* Starter chips — also show inline if we're mid-conversation and just the welcome */}
+        {!isWelcomeOnly && messages.length === 1 && (
           <div className="flex flex-wrap gap-2 mt-2">
             {STARTERS.map(s => (
               <button key={s} onClick={() => send(s)}
@@ -2009,7 +2144,8 @@ function IslamicChatbotModal({ onClose }) {
           </div>
         )}
         {loading && (
-          <div className="flex justify-start">
+          <div className="flex items-end gap-2 justify-start">
+            <Yusuf state="thinking" size="sm" className="sm:hidden mb-1 flex-shrink-0" aria-hidden="true" />
             <div className="px-4 py-3 rounded-sm border gold-border text-xs text-gold-dim" style={{ background: 'rgba(212,175,55,0.05)' }}>
               Thinking...
             </div>
@@ -2025,6 +2161,20 @@ function IslamicChatbotModal({ onClose }) {
         )}
         <div ref={bottomRef} />
       </div>
+
+      {/* Desktop: Yusuf anchored left of input with latest response bubble */}
+      {!isWelcomeOnly && (
+        <div className="hidden sm:flex items-end gap-3 mb-3">
+          <Yusuf state={yusufState} size="md" aria-hidden="true" />
+          {lastAssistantMsg && (
+            <SpeechBubble tail="left" className="flex-1">
+              <p className="text-xs line-clamp-3" style={{ color: '#0a1628' }}>
+                {lastAssistantMsg.content.slice(0, 120)}{lastAssistantMsg.content.length > 120 ? '…' : ''}
+              </p>
+            </SpeechBubble>
+          )}
+        </div>
+      )}
 
       {/* Input */}
       <div className="flex gap-2 mb-2">
