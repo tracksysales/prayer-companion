@@ -2104,7 +2104,7 @@ function YusufFloatingChat({ open, onToggle }) {
   }
 
   /* ── Position calculations ── */
-  const BTN_SIZE = 72;
+  const BTN_SIZE = 90;
   const PANEL_W = 420;
   const PANEL_H = 600;
   const GAP = 12;
@@ -2279,28 +2279,24 @@ function YusufFloatingChat({ open, onToggle }) {
         </div>
       )}
 
-      {/* ── Floating toggle button ── */}
+      {/* ── Floating toggle button — no background, pure Yusuf image ── */}
       <button
         ref={btnRef}
         onPointerDown={onBtnPointerDown}
         onPointerMove={onBtnPointerMove}
         onPointerUp={onBtnPointerUp}
         onPointerCancel={onBtnPointerUp}
-        className="fixed z-50 rounded-full border-2 select-none overflow-visible"
+        className="fixed z-50 select-none"
         style={{
           ...btnStyle,
           width: BTN_SIZE,
           height: BTN_SIZE,
-          borderColor: isDragging ? '#f5d060' : '#d4af37',
-          background: 'transparent',
+          background: 'none',
+          border: 'none',
+          outline: 'none',
+          padding: 0,
           touchAction: 'none',
           cursor: isDragging ? 'grabbing' : 'pointer',
-          transition: isDragging ? 'none' : 'box-shadow 0.2s',
-          boxShadow: isDragging
-            ? '0 0 0 6px rgba(212,175,55,0.4), 0 16px 48px rgba(0,0,0,0.8)'
-            : open
-            ? '0 0 0 4px rgba(212,175,55,0.2), 0 8px 32px rgba(0,0,0,0.6)'
-            : '0 4px 20px rgba(0,0,0,0.5)',
         }}
         aria-label={open ? 'Close Yusuf chat' : 'Ask Yusuf about Islam — long press to reposition'}
       >
@@ -2311,13 +2307,6 @@ function YusufFloatingChat({ open, onToggle }) {
           style={{ filter: 'drop-shadow(0 4px 14px rgba(212,175,55,0.55))' }}
           draggable={false}
         />
-        {/* Drag-mode pulse ring */}
-        {isDragging && (
-          <span
-            className="absolute inset-[-6px] rounded-full pointer-events-none"
-            style={{ border: '2px dashed rgba(212,175,55,0.6)', animation: 'yusuf-float 1s ease-in-out infinite' }}
-          />
-        )}
       </button>
     </>
   );
