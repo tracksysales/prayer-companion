@@ -181,6 +181,25 @@ const ISTIKHARAH = {
     'Jabir ibn Abdullah (RA) said: "The Messenger of Allah ﷺ used to teach us istikharah in all matters as he used to teach us a surah of the Quran." This prayer is prescribed for any matter of genuine uncertainty — marriage, travel, business, decisions — where the outcome is unknown. It is not used for matters already known to be halal/haram or already fard/haram.',
 };
 
+const AYATUL_KURSI = {
+  arabic: 'آيَةُ الْكُرْسِيّ',
+  name: 'Ayatul Kursi',
+  meaning: 'The Verse of the Throne — Quran 2:255',
+  text: 'اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ۚ لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ ۚ لَهُ مَا فِي السَّمَاوَاتِ وَمَا فِي الْأَرْضِ ۗ مَنْ ذَا الَّذِي يَشْفَعُ عِنْدَهُ إِلَّا بِإِذْنِهِ ۚ يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ ۖ وَلَا يُحِيطُونَ بِشَيْءٍ مِنْ عِلْمِهِ إِلَّا بِمَا شَاءَ ۚ وَسِعَ كُرْسِيُّهُ السَّمَاوَاتِ وَالْأَرْضَ ۖ وَلَا يَئُودُهُ حِفْظُهُمَا ۚ وَهُوَ الْعَلِيُّ الْعَظِيمُ',
+  translit: "Allāhu lā ilāha illā huw, al-ḥayy al-qayyūm. Lā ta'khudhuhū sinatun wa lā nawm. Lahū mā fī s-samāwāti wa mā fī l-arḍ. Man dhā lladhī yashfa'u 'indahū illā bi-idhnih. Ya'lamu mā bayna aydīhim wa mā khalfahum. Wa lā yuḥīṭūna bi-shay'im min 'ilmihī illā bimā shā'. Wasi'a kursiyyuhū s-samāwāti wa l-arḍ. Wa lā ya'ūduhū ḥifẓuhumā. Wa huwa l-'aliyy ul-'aẓīm.",
+  translation: 'Allah — there is no deity except Him, the Ever-Living, the Sustainer of existence. Neither drowsiness overtakes Him nor sleep. To Him belongs whatever is in the heavens and whatever is on the earth. Who is it that can intercede with Him except by His permission? He knows what is before them and what will be after them, and they encompass not a thing of His knowledge except for what He wills. His Kursi extends over the heavens and the earth, and their preservation tires Him not. And He is the Most High, the Most Great.',
+  audioUrl: 'https://everyayah.com/data/Alafasy_128kbps/002255.mp3',
+  reciter: 'Mishary Rashid Alafasy',
+  virtues: [
+    { icon: '🛡️', title: 'Protection from Shaytan', desc: 'Reciting it after each obligatory prayer grants protection until the next prayer. "Nothing is between you and entering Paradise except death." (Nasa\'i, authenticated)' },
+    { icon: '🌙', title: 'Before Sleep', desc: 'The Prophet ﷺ told Abu Hurayrah (RA): "Recite Ayatul Kursi before you sleep — a guardian from Allah will watch over you and Shaytan will not come near you until morning." (Bukhari)' },
+    { icon: '🏠', title: 'Entering the Home', desc: 'Reciting it upon entering one\'s home drives out poverty and protects the household. Imam Ahmad and Al-Hakim authenticated narrations supporting this.' },
+    { icon: '✨', title: 'Greatest Verse in the Quran', desc: 'The Prophet ﷺ asked Ubayy ibn Ka\'b (RA): "Which verse in the Book of Allah is the greatest?" He replied: "Allah and His Messenger know best." After being asked three times, he said: "Allahu la ilaha illa Huw, al-Hayy al-Qayyum." The Prophet ﷺ said: "Congratulations on your knowledge." (Muslim)' },
+    { icon: '🕌', title: 'After Every Fard Prayer', desc: 'The Prophet ﷺ said: "Whoever recites Ayatul Kursi after every obligatory prayer, nothing stands between him and Paradise except death." (Nasa\'i / Ibn Hibban — authenticated by Al-Albani)' },
+    { icon: '🤲', title: 'During Ruqyah', desc: 'Used in Islamic healing (ruqyah) to seek protection from evil eye (\'ayn), jinn, and Shaytan. Recited over water for healing, as established in prophetic practice.' },
+  ],
+};
+
 const CALC_METHODS = [
   { id: 2, name: 'ISNA (North America)' },
   { id: 3, name: 'Muslim World League' },
@@ -505,6 +524,7 @@ export default function App() {
   const [openStory, setOpenStory] = useState(null);
   const [openWudu, setOpenWudu] = useState(false);
   const [openChatbot, setOpenChatbot] = useState(false);
+  const [openAyatulKursi, setOpenAyatulKursi] = useState(false);
   const [guidedRakats, setGuidedRakats] = useState(2);
 
   const adhanAudioRef = useRef(null);
@@ -924,6 +944,12 @@ export default function App() {
                   <div className="font-display text-lg mb-1">Wudu Guide</div>
                   <div className="text-xs text-gold-dim">Step-by-step purification</div>
                 </button>
+                <button onClick={() => setOpenAyatulKursi(true)}
+                  className="p-5 rounded-sm border gold-border text-left hover:bg-gold/5 transition">
+                  <div className="font-arabic text-2xl gold-text mb-2">آيَةُ الْكُرْسِيّ</div>
+                  <div className="font-display text-lg mb-1">Ayatul Kursi</div>
+                  <div className="text-xs text-gold-dim">The Verse of the Throne</div>
+                </button>
                 <button onClick={() => setOpenChatbot(true)}
                   className="p-5 rounded-sm border gold-border text-left hover:bg-gold/5 transition relative overflow-hidden">
                   <div className="flex items-center gap-3">
@@ -1084,6 +1110,10 @@ export default function App() {
 
         {openWudu && (
           <WuduGuideModal onClose={() => setOpenWudu(false)} />
+        )}
+
+        {openAyatulKursi && (
+          <AyatulKursiModal onClose={() => setOpenAyatulKursi(false)} />
         )}
 
         <YusufFloatingChat open={openChatbot} onToggle={() => setOpenChatbot(prev => !prev)} />
@@ -2347,20 +2377,52 @@ function ProphetsStoriesModal({ onClose, onSelectStory }) {
 
 function StoryDetailModal({ story, onClose }) {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [loadingTts, setLoadingTts] = useState(false);
+  const ttsAudioRef = useRef(null);
 
-  function playStory() {
-    if (!hasSpeechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(story.story + ' Moral: ' + story.moral);
-    u.lang = 'en-US';
-    u.rate = 0.95;
-    u.onstart = () => setIsPlaying(true);
-    u.onend = () => setIsPlaying(false);
-    window.speechSynthesis.speak(u);
+  useEffect(() => {
+    return () => { stopStory(); };
+  }, []); // eslint-disable-line
+
+  async function playStory() {
+    setLoadingTts(true);
+    try {
+      const text = story.story + '\n\nMoral of the story: ' + story.moral;
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, languageCode: 'en-US', voiceName: 'en-US-Chirp3-HD-Algenib' }),
+      });
+      if (!res.ok) throw new Error('tts_api_failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      ttsAudioRef.current = new Audio(url);
+      ttsAudioRef.current.onended = () => { setIsPlaying(false); URL.revokeObjectURL(url); };
+      ttsAudioRef.current.onerror = () => { setIsPlaying(false); };
+      await ttsAudioRef.current.play();
+      setIsPlaying(true);
+    } catch {
+      // Fallback: Web Speech API
+      if (!hasSpeechSynthesis) return;
+      stopSpeaking();
+      const u = new SpeechSynthesisUtterance(story.story + ' Moral: ' + story.moral);
+      u.lang = 'en-US';
+      u.rate = 0.92;
+      u.onstart = () => setIsPlaying(true);
+      u.onend = () => setIsPlaying(false);
+      u.onerror = () => setIsPlaying(false);
+      setTimeout(() => window.speechSynthesis.speak(u), 50);
+    } finally {
+      setLoadingTts(false);
+    }
   }
 
   function stopStory() {
-    window.speechSynthesis.cancel();
+    if (ttsAudioRef.current) {
+      ttsAudioRef.current.pause();
+      ttsAudioRef.current = null;
+    }
+    stopSpeaking();
     setIsPlaying(false);
   }
 
@@ -2380,12 +2442,20 @@ function StoryDetailModal({ story, onClose }) {
         <span>Refs: {story.quranRefs.join(', ')}</span>
       </div>
 
-      {hasSpeechSynthesis && (
-        <button onClick={isPlaying ? stopStory : playStory}
-          className="flex items-center gap-2 text-xs px-4 py-2 rounded-sm border gold-border hover:bg-gold/10 transition gold-text mb-6">
-          {isPlaying ? '&#9209; Stop Listening' : '&#9654; Listen to Story'}
-        </button>
-      )}
+      <button onClick={isPlaying ? stopStory : playStory}
+        disabled={loadingTts}
+        className={`flex items-center gap-2 text-xs px-4 py-2 rounded-sm border transition gold-text mb-6 ${
+          isPlaying
+            ? 'border-rose-500/60 bg-rose-900/30 text-rose-300 hover:bg-rose-900/50'
+            : 'gold-border hover:bg-gold/10'
+        } disabled:opacity-50 disabled:cursor-wait`}>
+        {loadingTts
+          ? <><Loader2 className="w-3 h-3 animate-spin" /> Preparing audio…</>
+          : isPlaying
+            ? <><StopCircle className="w-3 h-3" /> Stop Listening</>
+            : <><PlayCircle className="w-3 h-3" /> Listen to Story (AI Narration)</>
+        }
+      </button>
 
       <div className="text-sm leading-relaxed whitespace-pre-line mb-6">{story.story}</div>
 
@@ -3093,6 +3163,121 @@ function TtsButton({ text, rate = 0.85 }) {
 }
 
 /* ============================================================
+   AYATUL KURSI MODAL
+   ============================================================ */
+
+function AyatulKursiModal({ onClose }) {
+  const audioRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
+    };
+  }, []);
+
+  function toggleAudio() {
+    if (!audioRef.current) return;
+    if (playing) {
+      audioRef.current.pause();
+      setPlaying(false);
+    } else {
+      audioRef.current.src = AYATUL_KURSI.audioUrl;
+      audioRef.current.play()
+        .then(() => setPlaying(true))
+        .catch(() => {});
+    }
+  }
+
+  return (
+    <Modal onClose={onClose}>
+      {/* Hidden audio element */}
+      <audio
+        ref={audioRef}
+        onEnded={() => setPlaying(false)}
+        onCanPlay={() => setLoaded(true)}
+        preload="none"
+      />
+
+      {/* Header */}
+      <div className="text-center mb-6">
+        <div className="font-arabic text-5xl gold-text mb-2">{AYATUL_KURSI.arabic}</div>
+        <div className="font-display text-3xl mb-1">{AYATUL_KURSI.name}</div>
+        <div className="text-xs text-gold-dim italic">{AYATUL_KURSI.meaning}</div>
+      </div>
+
+      {/* Audio recitation */}
+      <div className="mb-6 p-4 rounded-sm border gold-border flex items-center justify-between gap-4"
+        style={{ background: 'rgba(212,175,55,0.05)' }}>
+        <div>
+          <div className="text-xs uppercase tracking-widest gold-text mb-1">Beautiful Recitation</div>
+          <div className="text-xs text-gold-dim">{AYATUL_KURSI.reciter}</div>
+        </div>
+        <button onClick={toggleAudio}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-sm border font-semibold text-sm transition ${
+            playing
+              ? 'bg-rose-900/40 border-rose-500/60 text-rose-300 hover:bg-rose-900/60'
+              : 'bg-gold/15 border-gold/50 gold-text hover:bg-gold/25'
+          }`}>
+          {playing
+            ? <><StopCircle className="w-4 h-4" /> Stop</>
+            : <><PlayCircle className="w-4 h-4" /> Listen</>
+          }
+        </button>
+      </div>
+
+      {/* Full Arabic text */}
+      <div className="p-5 rounded-sm border gold-border mb-4" style={{ background: 'rgba(212,175,55,0.05)' }}>
+        <div className="font-arabic text-xl leading-loose text-right gold-text">{AYATUL_KURSI.text}</div>
+      </div>
+
+      {/* TTS button for Arabic pronunciation */}
+      {hasSpeechSynthesis && (
+        <div className="mb-4">
+          <TtsButton text={AYATUL_KURSI.text} />
+        </div>
+      )}
+
+      {/* Transliteration */}
+      <details className="mb-4">
+        <summary className="text-xs uppercase tracking-widest gold-text cursor-pointer mb-2">Transliteration</summary>
+        <div className="text-sm italic leading-relaxed mt-2 text-gold-dim">{AYATUL_KURSI.translit}</div>
+      </details>
+
+      {/* Translation */}
+      <div className="mb-6">
+        <div className="text-xs uppercase tracking-widest gold-text mb-2">Translation</div>
+        <div className="text-sm leading-relaxed">{AYATUL_KURSI.translation}</div>
+      </div>
+
+      {/* When & why to recite */}
+      <div className="mb-4">
+        <div className="text-xs uppercase tracking-widest gold-text mb-3">When & Why to Recite</div>
+        <div className="space-y-3">
+          {AYATUL_KURSI.virtues.map((v, i) => (
+            <div key={i} className="flex gap-3 p-3 rounded-sm border border-gold/20 bg-gold/5">
+              <div className="text-xl flex-shrink-0">{v.icon}</div>
+              <div>
+                <div className="font-display text-sm gold-text mb-1">{v.title}</div>
+                <div className="text-xs leading-relaxed text-cream/80">{v.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="text-[10px] text-gold-dim italic border-t gold-border pt-3 text-center">
+        Surah Al-Baqarah 2:255 · Reciter: {AYATUL_KURSI.reciter} · Source: islamcan.com / everyayah.com
+      </div>
+    </Modal>
+  );
+}
+
+/* ============================================================
    ISTIKHARAH MODAL — with TTS
    ============================================================ */
 
@@ -3199,9 +3384,9 @@ const STEP_DUAS = {
   ruku: 'سُبْحَانَ رَبِّيَ الْعَظِيمِ، سُبْحَانَ رَبِّيَ الْعَظِيمِ، سُبْحَانَ رَبِّيَ الْعَظِيمِ',
   itidal: 'سَمِعَ اللَّهُ لِمَنْ حَمِدَهُ، رَبَّنَا وَلَكَ الْحَمْدُ',
   sujud: 'سُبْحَانَ رَبِّيَ الْأَعْلَى، سُبْحَانَ رَبِّيَ الْأَعْلَى، سُبْحَانَ رَبِّيَ الْأَعْلَى',
-  jalsa: 'رَبِّ اغْفِرْ لِي، رَبِّ اغْفِرْ لِي',
+  jalsa: 'اللَّهُمَّ اغْفِرْ لِي، وَارْحَمْنِي، وَاهْدِنِي، وَاجْبُرْنِي، وَعَافِنِي، وَارْزُقْنِي، وَارْفَعْنِي',
   tashahhudMiddle: 'التَّحِيَّاتُ لِلَّهِ وَالصَّلَوَاتُ وَالطَّيِّبَاتُ، السَّلَامُ عَلَيْكَ أَيُّهَا النَّبِيُّ وَرَحْمَةُ اللَّهِ وَبَرَكَاتُهُ، السَّلَامُ عَلَيْنَا وَعَلَى عِبَادِ اللَّهِ الصَّالِحِينَ، أَشْهَدُ أَنْ لَا إِلَهَ إِلَّا اللَّهُ وَأَشْهَدُ أَنَّ مُحَمَّدًا عَبْدُهُ وَرَسُولُهُ',
-  tashahhudFinal: 'التَّحِيَّاتُ لِلَّهِ وَالصَّلَوَاتُ وَالطَّيِّبَاتُ، السَّلَامُ عَلَيْكَ أَيُّهَا النَّبِيُّ وَرَحْمَةُ اللَّهِ وَبَرَكَاتُهُ، السَّلَامُ عَلَيْنَا وَعَلَى عِبَادِ اللَّهِ الصَّالِحِينَ، أَشْهَدُ أَنْ لَا إِلَهَ إِلَّا اللَّهُ وَأَشْهَدُ أَنَّ مُحَمَّدًا عَبْدُهُ وَرَسُولُهُ. اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَعَلَى آلِ مُحَمَّدٍ، كَمَا صَلَّيْتَ عَلَى إِبْرَاهِيمَ وَعَلَى آلِ إِبْرَاهِيمَ، إِنَّكَ حَمِيدٌ مَجِيدٌ',
+  tashahhudFinal: 'التَّحِيَّاتُ لِلَّهِ وَالصَّلَوَاتُ وَالطَّيِّبَاتُ، السَّلَامُ عَلَيْكَ أَيُّهَا النَّبِيُّ وَرَحْمَةُ اللَّهِ وَبَرَكَاتُهُ، السَّلَامُ عَلَيْنَا وَعَلَى عِبَادِ اللَّهِ الصَّالِحِينَ، أَشْهَدُ أَنْ لَا إِلَهَ إِلَّا اللَّهُ وَأَشْهَدُ أَنَّ مُحَمَّدًا عَبْدُهُ وَرَسُولُهُ. اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَعَلَى آلِ مُحَمَّدٍ كَمَا صَلَّيْتَ عَلَى إِبْرَاهِيمَ وَعَلَى آلِ إِبْرَاهِيمَ إِنَّكَ حَمِيدٌ مَجِيدٌ. اللَّهُمَّ بَارِكْ عَلَى مُحَمَّدٍ وَعَلَى آلِ مُحَمَّدٍ كَمَا بَارَكْتَ عَلَى إِبْرَاهِيمَ وَعَلَى آلِ إِبْرَاهِيمَ إِنَّكَ حَمِيدٌ مَجِيدٌ. رَبِّ اجْعَلْنِي مُقِيمَ الصَّلَاةِ وَمِنْ ذُرِّيَّتِي رَبَّنَا وَتَقَبَّلْ دُعَاءِ رَبَّنَا اغْفِرْ لِي وَلِوَالِدَيَّ وَلِلْمُؤْمِنِينَ يَوْمَ يَقُومُ الْحِسَابُ',
   tasleem: 'السَّلَامُ عَلَيْكُمْ وَرَحْمَةُ اللَّهِ',
 };
 
@@ -3259,8 +3444,11 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
       });
       steps.push({
         phase: `Rakat ${i} — Jalsa`, arabic: 'الجلسة',
-        text: 'Rise to sitting position between the two prostrations. Say "Rabbigh-firli" (My Lord, forgive me).',
-        audio: null, phaseType: 'sitting', duration: 8, ttsDua: STEP_DUAS.jalsa,
+        text: 'Rise to sitting position between the two prostrations. Recite this beautiful dua:',
+        audio: null, phaseType: 'sitting', duration: 12, ttsDua: STEP_DUAS.jalsa,
+        duaArabic: 'اللَّهُمَّ اغْفِرْ لِي، وَارْحَمْنِي، وَاهْدِنِي، وَاجْبُرْنِي، وَعَافِنِي، وَارْزُقْنِي، وَارْفَعْنِي',
+        duaTranslit: "Allāhumma-ghfir lee, warhamnee, wahdinee, wajburnee, wa 'āfinee, warzuqnee, warfa'nee",
+        duaEnglish: 'O Allah, forgive me, have mercy on me, guide me, support me, protect me, provide for me, and elevate me.',
       });
       steps.push({
         phase: `Rakat ${i} — Sujud 2`, arabic: 'السجود',
@@ -3276,9 +3464,12 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
       }
       if (i === n) {
         steps.push({
-          phase: 'Final Tashahhud + Durood', arabic: 'الصلاة على النبي',
-          text: 'Recite the full Tashahhud, then the Durood (Salawat) on the Prophet ﷺ, then a dua of your choice.',
-          audio: null, phaseType: 'sitting', duration: 50, ttsDua: STEP_DUAS.tashahhudFinal,
+          phase: 'Final Tashahhud + Durood + Dua', arabic: 'الصلاة على النبي',
+          text: 'Recite the full Tashahhud, then the complete Durood Ibrahim (salah and barakah), then close with this dua from Surah Ibrahim (14:40–41):',
+          audio: null, phaseType: 'sitting', duration: 70, ttsDua: STEP_DUAS.tashahhudFinal,
+          duaArabic: 'رَبِّ اجْعَلْنِي مُقِيمَ الصَّلَاةِ وَمِنْ ذُرِّيَّتِي ۚ رَبَّنَا وَتَقَبَّلْ دُعَاءِ ﴿٤٠﴾ رَبَّنَا اغْفِرْ لِي وَلِوَالِدَيَّ وَلِلْمُؤْمِنِينَ يَوْمَ يَقُومُ الْحِسَابُ ﴿٤١﴾',
+          duaTranslit: "Rabbij'alnee muqeemas-salati wa min thurriyyatee, Rabbana wa taqabbal du'a. Rabbana-ghfir lee wa liwalidayya wa lil-mu'mineena yawma yaqoomul-hisaab.",
+          duaEnglish: 'My Lord, make me one who establishes prayer, and from my descendants. Our Lord, accept my supplication. Our Lord, forgive me, my parents, and the believers on the Day of Account. (Quran 14:40–41)',
         });
         steps.push({
           phase: 'Tasleem', arabic: 'التسليم',
@@ -3579,6 +3770,20 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
             <div className="font-arabic text-4xl gold-text mb-2">{step.arabic}</div>
             <div className="font-display text-2xl mb-3">{step.phase}</div>
             <div className="text-sm leading-relaxed">{step.text}</div>
+
+            {step.duaArabic && (
+              <div className="mt-4 p-3 rounded border border-gold/25 bg-gold/5 text-left">
+                <div className="font-arabic text-lg gold-text leading-loose text-right mb-2">{step.duaArabic}</div>
+                {step.duaTranslit && <div className="text-xs italic text-gold-dim mb-1">{step.duaTranslit}</div>}
+                {step.duaEnglish && <div className="text-xs leading-relaxed text-cream/80">{step.duaEnglish}</div>}
+                {hasSpeechSynthesis && (
+                  <button onClick={() => speakArabic(step.duaArabic)}
+                    className="mt-2 flex items-center gap-1 text-xs px-3 py-1 rounded-sm border gold-border hover:bg-gold/10 transition gold-text">
+                    🔊 Hear Arabic
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Auto-play countdown bar */}
