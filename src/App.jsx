@@ -488,6 +488,7 @@ export default function App() {
   const [openTasbih, setOpenTasbih] = useState(false);
   const [openAdhkar, setOpenAdhkar] = useState(null); // 'morning' | 'evening' | null
   const [openDuaLibrary, setOpenDuaLibrary] = useState(false);
+  const [openMosques, setOpenMosques] = useState(false);
   const [guidedRakats, setGuidedRakats] = useState(2);
 
   const adhanAudioRef = useRef(null);
@@ -883,6 +884,12 @@ export default function App() {
                   <div className="font-display text-lg mb-1">Dua Library</div>
                   <div className="text-xs text-gold-dim">40+ duas by situation</div>
                 </button>
+                <button onClick={() => setOpenMosques(true)}
+                  className="p-5 rounded-sm border gold-border text-left hover:bg-gold/5 transition">
+                  <div className="text-2xl mb-2">🕌</div>
+                  <div className="font-display text-lg mb-1">Nearby Mosques</div>
+                  <div className="text-xs text-gold-dim">Find mosques near you</div>
+                </button>
               </div>
             </div>
 
@@ -1018,6 +1025,10 @@ export default function App() {
 
         {openDuaLibrary && (
           <DuaLibraryModal onClose={() => setOpenDuaLibrary(false)} />
+        )}
+
+        {openMosques && (
+          <NearbyMosquesModal location={location} onClose={() => setOpenMosques(false)} />
         )}
 
         {/* Settings modal */}
@@ -1467,6 +1478,140 @@ const DUA_LIBRARY = [
   { id: 's6', cat: 'Special Occasions', situation: 'During Ramadan', arabic: 'رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ', translit: "Rabbana atina fid-dunya hasanatan wa fil-akhirati hasanatan wa qina 'adhaban-nar", translation: 'Our Lord, give us good in this world and good in the Hereafter, and protect us from the punishment of the Fire.', source: 'Quran 2:201', context: 'Anas (RA) said the Prophet recited this dua more than any other supplication.' },
   { id: 's7', cat: 'Special Occasions', situation: 'Upon hearing adhan', arabic: 'أَشْهَدُ أَنْ لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، وَأَنَّ مُحَمَّدًا عَبْدُهُ وَرَسُولُهُ', translit: "Ashhadu an la ilaha illallah wahdahu la sharika lah, wa anna Muhammadan 'abduhu wa rasuluh", translation: 'I testify that there is no deity except Allah, alone without partner, and that Muhammad is His servant and Messenger.', source: 'Hisn al-Muslim #17 — Muslim 386', context: "Repeat each phrase of the adhan after the muadhin, except during hayya 'alas-salah say: La hawla wa la quwwata illa billah." },
 ];
+
+/* ============================================================
+   NEARBY MOSQUES — Overpass API (OpenStreetMap)
+   ============================================================ */
+
+function NearbyMosquesModal({ location, onClose }) {
+  const CACHE_KEY = 'pc_mosques_cache';
+  const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+  const [mosques, setMosques] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [radius, setRadius] = useState(10000);
+
+  useEffect(() => {
+    if (location) loadMosques(radius);
+  }, []); // eslint-disable-line
+
+  async function loadMosques(searchRadius) {
+    // Check cache
+    try {
+      const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+      if (cached && Date.now() - cached.ts < CACHE_TTL && cached.lat === location.lat && cached.lon === location.lon && cached.radius === searchRadius) {
+        setMosques(cached.mosques);
+        return;
+      }
+    } catch {}
+
+    setLoading(true);
+    setError(null);
+    try {
+      const query = `[out:json];node[amenity=place_of_worship][religion=muslim](around:${searchRadius},${location.lat},${location.lon});out;`;
+      const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Overpass API error');
+      const data = await res.json();
+
+      const results = (data.elements || [])
+        .map(el => ({
+          id: el.id,
+          name: el.tags?.name || el.tags?.['name:en'] || 'Mosque',
+          lat: el.lat,
+          lon: el.lon,
+          distance: haversineDistance(location.lat, location.lon, el.lat, el.lon),
+        }))
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, 20);
+
+      setMosques(results);
+
+      // Cache result
+      localStorage.setItem(CACHE_KEY, JSON.stringify({
+        ts: Date.now(), lat: location.lat, lon: location.lon, radius: searchRadius, mosques: results,
+      }));
+    } catch (e) {
+      setError('Could not load mosques. Check your internet connection.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function retry25km() {
+    setRadius(25000);
+    loadMosques(25000);
+  }
+
+  return (
+    <Modal onClose={onClose}>
+      <div className="flex items-center gap-3 mb-6">
+        <div className="text-3xl">🕌</div>
+        <div>
+          <div className="font-display text-3xl">Nearby Mosques</div>
+          <div className="text-xs text-gold-dim">Within {radius >= 25000 ? '25' : '10'} km of {location?.city}</div>
+        </div>
+      </div>
+
+      {loading && (
+        <div className="text-center py-8">
+          <div className="text-gold-dim text-sm">Searching for mosques...</div>
+          <div className="mt-3 h-1 rounded bg-gold/20 overflow-hidden">
+            <div className="h-full bg-gold animate-pulse" style={{ width: '60%' }}></div>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="p-4 rounded-sm border border-rose-500/40 bg-rose-900/20 text-rose-300 text-sm text-center mb-4">
+          {error}
+          <button onClick={() => loadMosques(radius)} className="block mx-auto mt-2 text-xs underline">Try again</button>
+        </div>
+      )}
+
+      {!loading && mosques !== null && mosques.length === 0 && (
+        <div className="text-center py-8">
+          <div className="text-2xl mb-3">🕌</div>
+          <div className="text-sm text-gold-dim mb-4">No mosques found within {radius >= 25000 ? '25' : '10'} km.</div>
+          {radius < 25000 && (
+            <button onClick={retry25km}
+              className="px-5 py-2 rounded-sm border-2 border-gold bg-gold/10 hover:bg-gold/20 transition gold-text font-semibold text-sm">
+              Expand search to 25 km
+            </button>
+          )}
+        </div>
+      )}
+
+      {!loading && mosques && mosques.length > 0 && (
+        <>
+          <div className="text-xs text-gold-dim mb-4">{mosques.length} mosque{mosques.length !== 1 ? 's' : ''} found</div>
+          <div className="space-y-2">
+            {mosques.map(m => (
+              <div key={m.id} className="p-4 rounded-sm border gold-border flex items-center justify-between gap-3"
+                style={{ background: 'rgba(212,175,55,0.03)' }}>
+                <div className="min-w-0">
+                  <div className="font-display text-base truncate">{m.name}</div>
+                  <div className="text-xs text-gold-dim">
+                    {m.distance < 1 ? `${Math.round(m.distance * 1000)} m` : `${m.distance.toFixed(1)} km`}
+                    {' '}· {(m.distance * 0.621371).toFixed(1)} mi
+                  </div>
+                </div>
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${m.lat},${m.lon}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-shrink-0 px-3 py-1.5 rounded-sm border gold-border hover:bg-gold/10 transition gold-text text-xs font-semibold whitespace-nowrap">
+                  Directions →
+                </a>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 text-[10px] text-gold-dim text-center">Data from OpenStreetMap via Overpass API · Cached 24h</div>
+        </>
+      )}
+    </Modal>
+  );
+}
 
 function DuaLibraryModal({ onClose }) {
   const [search, setSearch] = useState('');
