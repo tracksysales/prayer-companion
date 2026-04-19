@@ -303,12 +303,15 @@ function minutesToCountdown(mins) {
 
 function speakArabic(text, rate = 0.85) {
   if (!('speechSynthesis' in window)) return null;
-  window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'ar-SA';
   u.rate = rate;
   u.pitch = 1.0;
-  window.speechSynthesis.speak(u);
+  // Chrome has a race condition where cancel() followed immediately by speak()
+  // causes the utterance to be silently dropped. We cancel first, then defer
+  // the speak() call to the next event-loop tick to let cancel complete.
+  window.speechSynthesis.cancel();
+  setTimeout(() => window.speechSynthesis.speak(u), 50);
   return u;
 }
 
@@ -1920,7 +1923,7 @@ function Yusuf({ state = 'waving', size = 'md', className = '' }) {
         alt="Yusuf, your Islamic learning companion"
         onError={(e) => { e.target.src = '/images/yusuf/yusuf-waving.png'; }}
         className={`w-full h-full object-contain select-none pointer-events-none ${animClass}`}
-        style={{ filter: 'drop-shadow(0 10px 15px rgba(212, 175, 55, 0.3))' }}
+        style={{ filter: 'drop-shadow(0 10px 15px rgba(212, 175, 55, 0.3))', mixBlendMode: 'screen', background: 'transparent' }}
         draggable={false}
       />
     </div>
@@ -2304,7 +2307,7 @@ function YusufFloatingChat({ open, onToggle }) {
           src={`/images/yusuf/yusuf-${isDragging ? 'happy' : 'waving'}.png`}
           alt="Yusuf"
           className={`w-full h-full object-contain ${isDragging ? '' : 'yusuf-idle'}`}
-          style={{ filter: 'drop-shadow(0 4px 14px rgba(212,175,55,0.55))' }}
+          style={{ filter: 'drop-shadow(0 4px 14px rgba(212,175,55,0.55))', mixBlendMode: 'screen', background: 'transparent' }}
           draggable={false}
         />
       </button>
