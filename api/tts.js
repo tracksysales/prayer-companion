@@ -13,6 +13,7 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: 'TTS_KEY_MISSING' });
   }
 
+  // Arabic: ar-XA-Wavenet-B | English: en-US-Chirp3-HD-Puck
   const { text, languageCode = 'en-US', voiceName = 'en-US-Chirp3-HD-Puck' } = req.body || {};
   if (!text || typeof text !== 'string') {
     return res.status(400).json({ error: 'text required' });

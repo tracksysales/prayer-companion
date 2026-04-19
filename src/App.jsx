@@ -317,223 +317,93 @@ function minutesToCountdown(mins) {
 }
 
 /* ============================================================
-   TTS HELPERS — Arabic speech synthesis
+   TTS HELPERS — Google Cloud TTS via /api/tts (no browser Speech API)
+   Arabic: ar-XA-Wavenet-B (neural Arabic voice)
+   English: en-US-Chirp3-HD-Puck (high-quality English)
    ============================================================ */
 
-// Detect whether the browser has an Arabic voice installed.
-// Chrome on Android ships ar-SA voices; Chrome on Windows/macOS often does NOT.
-// We cache the result after voices load so it's fast on repeated calls.
-let _arabicVoiceCache = null; // null = unchecked, false = none found, Voice = found
-
-function getArabicVoice() {
-  if (_arabicVoiceCache !== null) return _arabicVoiceCache;
-  if (!('speechSynthesis' in window)) return false;
-  const voices = window.speechSynthesis.getVoices();
-  const found = voices.find(v => v.lang.startsWith('ar')) || false;
-  if (voices.length > 0) _arabicVoiceCache = found; // only cache once voices are loaded
-  return found;
-}
-
-// Invalidate cache when voices list changes (async on Chrome)
-if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-  window.speechSynthesis.onvoiceschanged = () => { _arabicVoiceCache = null; };
-}
-
-function speakArabic(text, rate = 0.85) {
-  if (!('speechSynthesis' in window)) return null;
-  const voice = getArabicVoice();
-  if (!voice) {
-    // No Arabic TTS voice — silently skip (caller should show fallback UI)
-    return null;
-  }
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = 'ar-SA';
-  u.rate = rate;
-  u.pitch = 1.0;
-  u.voice = voice;
-  // Chrome bugs: (1) cancel()→speak() in same tick silently drops the utterance;
-  // (2) speechSynthesis gets stuck in a paused state and ignores speak() calls.
-  // Fix: cancel, then after 100ms call resume() to unstick + speak().
-  window.speechSynthesis.cancel();
-  setTimeout(() => {
-    window.speechSynthesis.resume();
-    window.speechSynthesis.speak(u);
-  }, 100);
-  return u;
-}
+// Global audio ref for Arabic TTS — one at a time, cancel previous
+let _arabicAudioRef = null;
 
 function stopSpeaking() {
-  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  if (_arabicAudioRef) {
+    _arabicAudioRef.pause();
+    _arabicAudioRef.src = '';
+    _arabicAudioRef = null;
+  }
 }
 
-function speakEnglish(text) {
-  if (!('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = 'en-US';
-  u.rate = 0.95;
-  window.speechSynthesis.speak(u);
+async function speakArabicTts(text, { onStart, onEnd, onError } = {}) {
+  stopSpeaking();
+  try {
+    const res = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text,
+        languageCode: 'ar-XA',
+        voiceName: 'ar-XA-Wavenet-B',
+      }),
+    });
+    if (!res.ok) throw new Error('tts_failed');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    _arabicAudioRef = audio;
+    audio.onended = () => { URL.revokeObjectURL(url); _arabicAudioRef = null; onEnd?.(); };
+    audio.onerror = () => { URL.revokeObjectURL(url); _arabicAudioRef = null; onError?.(); };
+    await audio.play();
+    onStart?.();
+  } catch (e) {
+    onError?.();
+  }
 }
 
-const hasSpeechSynthesis = typeof window !== 'undefined' && 'speechSynthesis' in window;
+// hasSpeechSynthesis kept as false — we no longer use the browser Speech API
+const hasSpeechSynthesis = false;
 
-// hasArabicTts — true only if an Arabic voice is actually installed.
-// Used to decide whether to show TTS buttons or audio-fallback buttons.
-function useHasArabicTts() {
-  const [has, setHas] = useState(() => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return false;
-    const voices = window.speechSynthesis.getVoices();
-    return voices.some(v => v.lang.startsWith('ar'));
-  });
-  useEffect(() => {
-    if (!('speechSynthesis' in window)) return;
-    const check = () => {
-      const voices = window.speechSynthesis.getVoices();
-      setHas(voices.some(v => v.lang.startsWith('ar')));
-    };
-    window.speechSynthesis.addEventListener('voiceschanged', check);
-    check();
-    return () => window.speechSynthesis.removeEventListener('voiceschanged', check);
-  }, []);
-  return has;
-}
+// Legacy stub — kept so existing call sites compile without changes
+// All Arabic audio now routes through speakArabicTts() via ArabicAudioButton
+function speakArabic() { return null; }
+function getArabicVoice() { return false; }
 
 /* ============================================================
-   SVG PRAYER FIGURE COMPONENTS — gold-on-dark posture guides
+   PRAYER POSITION FIGURE COMPONENTS — Yusuf character images
    ============================================================ */
 
-function FigureStanding() {
-  // Upright, arms folded across chest (right hand over left)
-  return (
-    <svg viewBox="0 0 180 220" width="180" height="220" className="mx-auto" aria-hidden="true">
-      {/* Head */}
-      <circle cx="90" cy="30" r="20" fill="#d4af37" opacity="0.9" />
-      {/* Neck */}
-      <rect x="83" y="48" width="14" height="12" rx="5" fill="#d4af37" opacity="0.85" />
-      {/* Robe body */}
-      <path d="M52 62 Q70 56 90 56 Q110 56 128 62 L132 170 Q90 178 48 170 Z" fill="#d4af37" opacity="0.7" />
-      {/* Right arm over left — folded on chest */}
-      <path d="M68 96 Q54 90 52 102 Q50 114 70 114 Q82 114 90 110"
-        stroke="#d4af37" strokeWidth="9" fill="none" strokeLinecap="round" opacity="0.9" />
-      <path d="M112 100 Q126 94 128 106 Q130 118 110 118 Q98 118 90 114"
-        stroke="#d4af37" strokeWidth="8" fill="none" strokeLinecap="round" opacity="0.75" />
-      {/* Legs */}
-      <path d="M74 170 L70 212" stroke="#d4af37" strokeWidth="11" strokeLinecap="round" opacity="0.8" />
-      <path d="M106 170 L110 212" stroke="#d4af37" strokeWidth="11" strokeLinecap="round" opacity="0.8" />
-    </svg>
-  );
-}
+const PHASE_FIGURE_SRC = {
+  standing: '/images/yusuf/yusuf-qiyam.png',
+  bowing: '/images/yusuf/yusuf-ruku.png',
+  prostrating: '/images/yusuf/yusuf-sujud.png',
+  sitting: '/images/yusuf/yusuf-jalsa.png',
+  tasleem: '/images/yusuf/yusuf-jalsa.png', // tasleem is also sitting position
+};
 
-function FigureBowing() {
-  // Ruku — bent ~90° at hips, back parallel to ground, hands on knees
+function PrayerFigure({ phaseType }) {
+  const src = PHASE_FIGURE_SRC[phaseType] || PHASE_FIGURE_SRC.standing;
   return (
-    <svg viewBox="0 0 200 200" width="180" height="180" className="mx-auto" aria-hidden="true">
-      {/* Head — forward and down */}
-      <circle cx="162" cy="78" r="19" fill="#d4af37" opacity="0.9" />
-      {/* Neck connecting head to spine */}
-      <line x1="145" y1="88" x2="130" y2="92" stroke="#d4af37" strokeWidth="10" strokeLinecap="round" opacity="0.85" />
-      {/* Back — horizontal */}
-      <line x1="130" y1="92" x2="48" y2="95" stroke="#d4af37" strokeWidth="13" strokeLinecap="round" opacity="0.8" />
-      {/* Hips down — legs vertical */}
-      <line x1="58" y1="95" x2="55" y2="175" stroke="#d4af37" strokeWidth="12" strokeLinecap="round" opacity="0.8" />
-      <line x1="78" y1="95" x2="80" y2="175" stroke="#d4af37" strokeWidth="12" strokeLinecap="round" opacity="0.8" />
-      {/* Arms — hands on knees */}
-      <line x1="130" y1="92" x2="62" y2="130" stroke="#d4af37" strokeWidth="8" strokeLinecap="round" opacity="0.75" />
-      <line x1="62" y1="130" x2="58" y2="145" stroke="#d4af37" strokeWidth="7" strokeLinecap="round" opacity="0.7" />
-      {/* Feet */}
-      <line x1="55" y1="175" x2="38" y2="185" stroke="#d4af37" strokeWidth="7" strokeLinecap="round" opacity="0.7" />
-      <line x1="80" y1="175" x2="63" y2="185" stroke="#d4af37" strokeWidth="7" strokeLinecap="round" opacity="0.7" />
-    </svg>
-  );
-}
-
-function FigureProstrating() {
-  // Sujud — forehead, nose, hands, knees, toes on ground; compact triangular silhouette
-  return (
-    <svg viewBox="0 0 200 160" width="180" height="145" className="mx-auto" aria-hidden="true">
-      {/* Ground line */}
-      <line x1="20" y1="135" x2="180" y2="135" stroke="#d4af37" strokeWidth="2" opacity="0.25" />
-      {/* Head on ground */}
-      <circle cx="155" cy="118" r="17" fill="#d4af37" opacity="0.9" />
-      {/* Forehead touching ground */}
-      <ellipse cx="155" cy="134" rx="12" ry="4" fill="#d4af37" opacity="0.5" />
-      {/* Back rising to hips */}
-      <path d="M138 118 Q100 85 68 75 Q52 70 45 78" stroke="#d4af37" strokeWidth="13" fill="none" strokeLinecap="round" opacity="0.8" />
-      {/* Hips at peak */}
-      <ellipse cx="45" cy="80" rx="14" ry="10" fill="#d4af37" opacity="0.75" />
-      {/* Legs going back down to knees on ground */}
-      <path d="M42 88 Q35 115 42 132" stroke="#d4af37" strokeWidth="11" fill="none" strokeLinecap="round" opacity="0.8" />
-      <path d="M58 85 Q55 112 62 130" stroke="#d4af37" strokeWidth="11" fill="none" strokeLinecap="round" opacity="0.8" />
-      {/* Hands on ground either side of head */}
-      <ellipse cx="128" cy="134" rx="14" ry="5" fill="#d4af37" opacity="0.65" />
-      <ellipse cx="178" cy="134" rx="14" ry="5" fill="#d4af37" opacity="0.65" />
-      {/* Toes */}
-      <ellipse cx="45" cy="134" rx="10" ry="4" fill="#d4af37" opacity="0.55" />
-      <ellipse cx="63" cy="134" rx="10" ry="4" fill="#d4af37" opacity="0.55" />
-    </svg>
-  );
-}
-
-function FigureSitting() {
-  // Jalsa / Tashahhud — kneeling on heels, back upright, hands on thighs
-  return (
-    <svg viewBox="0 0 180 220" width="180" height="220" className="mx-auto" aria-hidden="true">
-      {/* Head */}
-      <circle cx="90" cy="32" r="20" fill="#d4af37" opacity="0.9" />
-      {/* Neck */}
-      <rect x="83" y="50" width="14" height="12" rx="5" fill="#d4af37" opacity="0.85" />
-      {/* Upper body / robe torso */}
-      <path d="M58 62 Q74 56 90 56 Q106 56 122 62 L124 130 Q90 136 56 130 Z" fill="#d4af37" opacity="0.75" />
-      {/* Arms resting on thighs */}
-      <path d="M62 100 Q58 118 72 130" stroke="#d4af37" strokeWidth="8" fill="none" strokeLinecap="round" opacity="0.8" />
-      <path d="M118 100 Q122 118 108 130" stroke="#d4af37" strokeWidth="8" fill="none" strokeLinecap="round" opacity="0.8" />
-      {/* Thighs going forward from sitting position */}
-      <path d="M60 130 Q44 138 38 148" stroke="#d4af37" strokeWidth="12" fill="none" strokeLinecap="round" opacity="0.75" />
-      <path d="M120 130 Q136 138 142 148" stroke="#d4af37" strokeWidth="12" fill="none" strokeLinecap="round" opacity="0.75" />
-      {/* Lower legs folded back under body */}
-      <path d="M38 148 Q28 168 38 185" stroke="#d4af37" strokeWidth="10" fill="none" strokeLinecap="round" opacity="0.7" />
-      <path d="M142 148 Q152 168 142 185" stroke="#d4af37" strokeWidth="10" fill="none" strokeLinecap="round" opacity="0.7" />
-      {/* Feet/heels on ground */}
-      <ellipse cx="44" cy="188" rx="16" ry="5" fill="#d4af37" opacity="0.6" />
-      <ellipse cx="136" cy="188" rx="16" ry="5" fill="#d4af37" opacity="0.6" />
-    </svg>
-  );
-}
-
-function FigureTasleem() {
-  // Tasleem — sitting, head turned to right side
-  return (
-    <svg viewBox="0 0 180 220" width="180" height="220" className="mx-auto" aria-hidden="true">
-      {/* Head turned right — offset and slightly rotated */}
-      <circle cx="106" cy="30" r="20" fill="#d4af37" opacity="0.9" />
-      {/* Ear / face direction indicator */}
-      <ellipse cx="122" cy="30" rx="6" ry="9" fill="#d4af37" opacity="0.5" />
-      {/* Neck — slightly angled */}
-      <line x1="100" y1="48" x2="90" y2="60" stroke="#d4af37" strokeWidth="12" strokeLinecap="round" opacity="0.85" />
-      {/* Upper body / robe torso — same as sitting */}
-      <path d="M58 62 Q74 56 90 56 Q106 56 122 62 L124 130 Q90 136 56 130 Z" fill="#d4af37" opacity="0.75" />
-      {/* Arms resting on thighs */}
-      <path d="M62 100 Q58 118 72 130" stroke="#d4af37" strokeWidth="8" fill="none" strokeLinecap="round" opacity="0.8" />
-      <path d="M118 100 Q122 118 108 130" stroke="#d4af37" strokeWidth="8" fill="none" strokeLinecap="round" opacity="0.8" />
-      {/* Thighs */}
-      <path d="M60 130 Q44 138 38 148" stroke="#d4af37" strokeWidth="12" fill="none" strokeLinecap="round" opacity="0.75" />
-      <path d="M120 130 Q136 138 142 148" stroke="#d4af37" strokeWidth="12" fill="none" strokeLinecap="round" opacity="0.75" />
-      {/* Lower legs */}
-      <path d="M38 148 Q28 168 38 185" stroke="#d4af37" strokeWidth="10" fill="none" strokeLinecap="round" opacity="0.7" />
-      <path d="M142 148 Q152 168 142 185" stroke="#d4af37" strokeWidth="10" fill="none" strokeLinecap="round" opacity="0.7" />
-      {/* Feet */}
-      <ellipse cx="44" cy="188" rx="16" ry="5" fill="#d4af37" opacity="0.6" />
-      <ellipse cx="136" cy="188" rx="16" ry="5" fill="#d4af37" opacity="0.6" />
-    </svg>
+    <div className="relative mx-auto flex items-center justify-center" style={{ width: 180, height: 180 }}>
+      <img
+        src={src}
+        alt={`Prayer position: ${phaseType}`}
+        className="w-full h-full object-contain select-none pointer-events-none"
+        style={{
+          filter: 'drop-shadow(0 8px 16px rgba(212, 175, 55, 0.35))',
+          mixBlendMode: 'screen',
+          background: 'transparent',
+        }}
+        draggable={false}
+      />
+    </div>
   );
 }
 
 const PHASE_FIGURES = {
-  standing: FigureStanding,
-  bowing: FigureBowing,
-  prostrating: FigureProstrating,
-  sitting: FigureSitting,
-  tasleem: FigureTasleem,
+  standing: () => <PrayerFigure phaseType="standing" />,
+  bowing: () => <PrayerFigure phaseType="bowing" />,
+  prostrating: () => <PrayerFigure phaseType="prostrating" />,
+  sitting: () => <PrayerFigure phaseType="sitting" />,
+  tasleem: () => <PrayerFigure phaseType="tasleem" />,
 };
 
 /* ============================================================
@@ -571,6 +441,7 @@ export default function App() {
   const [openMosques, setOpenMosques] = useState(false);
   const [openStories, setOpenStories] = useState(false);
   const [openStory, setOpenStory] = useState(null);
+  const [openSeerah, setOpenSeerah] = useState(false);
   const [openWudu, setOpenWudu] = useState(false);
   const [openChatbot, setOpenChatbot] = useState(false);
   const [openAyatulKursi, setOpenAyatulKursi] = useState(false);
@@ -901,10 +772,21 @@ export default function App() {
 
             {/* Other times */}
             <div className="grid grid-cols-3 gap-3 mb-10 text-center text-xs">
-              {['Sunrise', 'Imsak', 'Midnight'].map(k => times[k] && (
-                <div key={k} className="p-3 rounded-sm border border-gold/20">
-                  <div className="text-[10px] uppercase tracking-widest gold-text">{k}</div>
-                  <div className="tabular-nums text-sm mt-1">{formatTime(times[k])}</div>
+              {[
+                { key: 'Sunrise', tooltip: 'End of Fajr window — prayer is no longer valid after this time' },
+                { key: 'Imsak', tooltip: 'Stop eating (Ramadan) — ~10 min before Fajr, the last moment of Suhoor' },
+                { key: 'Midnight', tooltip: 'Islamic midnight — midpoint between Maghrib and Fajr. Marks the Tahajjud (night prayer) window' },
+              ].map(({ key, tooltip }) => times[key] && (
+                <div key={key} className="relative group p-3 rounded-sm border border-gold/20">
+                  <div className="flex items-center justify-center gap-1">
+                    <div className="text-[10px] uppercase tracking-widest gold-text">{key}</div>
+                    <span className="text-[10px] text-gold-dim cursor-help" title={tooltip}>ⓘ</span>
+                  </div>
+                  <div className="tabular-nums text-sm mt-1">{formatTime(times[key])}</div>
+                  {/* Tooltip on hover */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 px-2 py-1.5 rounded text-[10px] leading-relaxed text-cream bg-midnight border border-gold/30 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 text-left shadow-lg">
+                    {tooltip}
+                  </div>
                 </div>
               ))}
             </div>
@@ -986,6 +868,12 @@ export default function App() {
                   <div className="text-2xl mb-2">📖</div>
                   <div className="font-display text-lg mb-1">Prophets' Stories</div>
                   <div className="text-xs text-gold-dim">Stories from the Quran</div>
+                </button>
+                <button onClick={() => setOpenSeerah(true)}
+                  className="p-5 rounded-sm border gold-border text-left hover:bg-gold/5 transition">
+                  <div className="text-2xl mb-2">🌙</div>
+                  <div className="font-display text-lg mb-1">Seerah Series</div>
+                  <div className="text-xs text-gold-dim">Life of the Prophet ﷺ</div>
                 </button>
                 <button onClick={() => setOpenWudu(true)}
                   className="p-5 rounded-sm border gold-border text-left hover:bg-gold/5 transition">
@@ -1157,6 +1045,10 @@ export default function App() {
           <StoryDetailModal story={openStory} onClose={() => setOpenStory(null)} />
         )}
 
+        {openSeerah && (
+          <SeerahSeriesModal onClose={() => setOpenSeerah(false)} />
+        )}
+
         {openWudu && (
           <WuduGuideModal onClose={() => setOpenWudu(false)} />
         )}
@@ -1176,26 +1068,74 @@ export default function App() {
               <label className="text-xs uppercase tracking-widest gold-text mb-2 block">Calculation Method</label>
               <select value={method} onChange={e => setMethod(Number(e.target.value))}
                 className="w-full px-3 py-2 bg-midnight border gold-border rounded-sm focus:outline-none focus:border-gold">
-                {CALC_METHODS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                {CALC_METHODS.map(m => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}{m.id === 2 ? ' ★ Recommended for North America' : ''}
+                  </option>
+                ))}
               </select>
-              <div className="text-xs text-gold-dim mt-2">Different Islamic authorities use slightly different angle calculations for Fajr and Isha.</div>
+              <div className="text-xs text-gold-dim mt-2">
+                For the USA and Canada, <span className="gold-text">ISNA (Islamic Society of North America)</span> is the standard used by most mosques. Different authorities use slightly different angle calculations for Fajr and Isha.
+              </div>
             </div>
 
             <div className="mb-5">
-              <label className="text-xs uppercase tracking-widest gold-text mb-2 block">Madhhab (for Asr timing)</label>
+              <label className="text-xs uppercase tracking-widest gold-text mb-2 block">Asr Timing (Madhhab)</label>
               <div className="flex gap-2">
                 <button onClick={() => setMadhhab(0)} className={`flex-1 py-2 rounded-sm border text-sm ${madhhab === 0 ? 'bg-gold text-midnight border-gold font-semibold' : 'gold-border'}`}>
-                  Standard (Shafi/Maliki/Hanbali)
+                  Shafi'i / Maliki / Hanbali
                 </button>
                 <button onClick={() => setMadhhab(1)} className={`flex-1 py-2 rounded-sm border text-sm ${madhhab === 1 ? 'bg-gold text-midnight border-gold font-semibold' : 'gold-border'}`}>
                   Hanafi
+                </button>
+              </div>
+              <div className="text-xs text-gold-dim mt-2">
+                <span className="gold-text">Shafi'i / Maliki / Hanbali:</span> Asr begins when an object's shadow equals its height. <span className="gold-text">Hanafi:</span> Asr begins when shadow is twice the object's height (later time). Most North American mosques follow Shafi'i.
+              </div>
+            </div>
+
+            <div className="mb-5">
+              <label className="text-xs uppercase tracking-widest gold-text mb-2 block">Adhan Reciter</label>
+              <select value={adhanIndex} onChange={e => setAdhanIndex(Number(e.target.value))}
+                className="w-full px-3 py-2 bg-midnight border gold-border rounded-sm focus:outline-none focus:border-gold">
+                {ADHAN_LIBRARY.map((a, i) => (
+                  <option key={i} value={i}>{a.name}{a.fajrOnly ? ' (Fajr only)' : ''}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => playAdhan(ADHAN_LIBRARY[adhanIndex].url)}
+                className="mt-2 text-xs px-3 py-1.5 rounded-sm border gold-border hover:bg-gold/10 transition gold-text">
+                ▶ Preview selected adhan
+              </button>
+            </div>
+
+            <div className="mb-5 pt-4 border-t border-gold/20">
+              <label className="text-xs uppercase tracking-widest gold-text mb-3 block">Reset Progress</label>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => {
+                    if (window.confirm('Reset all Prophet Stories progress?')) {
+                      try { localStorage.removeItem('completed_prophet_stories'); } catch {}
+                    }
+                  }}
+                  className="w-full py-2 rounded-sm border border-rose-500/40 bg-rose-900/20 text-rose-300 hover:bg-rose-900/40 transition text-sm">
+                  Reset Prophet Stories Progress
+                </button>
+                <button
+                  onClick={() => {
+                    if (window.confirm('Reset all Seerah Series progress?')) {
+                      try { localStorage.removeItem('completed_seerah'); } catch {}
+                    }
+                  }}
+                  className="w-full py-2 rounded-sm border border-rose-500/40 bg-rose-900/20 text-rose-300 hover:bg-rose-900/40 transition text-sm">
+                  Reset Seerah Series Progress
                 </button>
               </div>
             </div>
 
             <button onClick={() => { location && fetchTimes(location); setShowSettings(false); }}
               className="w-full py-3 rounded-sm bg-gold text-midnight font-semibold hover:bg-gold-bright transition">
-              Apply & Refresh
+              Apply & Refresh Times
             </button>
           </Modal>
         )}
@@ -1499,12 +1439,7 @@ function AdhkarModal({ mode, onClose }) {
       </div>
 
       {/* TTS button */}
-      {hasSpeechSynthesis && (
-        <button onClick={() => speakArabic(current.arabic)}
-          className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-sm border gold-border hover:bg-gold/10 transition gold-text mb-4">
-          Hear Arabic
-        </button>
-      )}
+      <ArabicAudioButton text={current.arabic} label="🔊 Hear Arabic" className="mb-4" />
 
       {/* Count target */}
       <div className="text-center mb-4">
@@ -1918,12 +1853,7 @@ function WuduGuideModal({ onClose }) {
           <>
             <div className="font-arabic text-lg gold-text leading-loose mb-1">{current.arabic}</div>
             <div className="text-xs text-gold-dim italic mb-3">{current.translit}</div>
-            {hasSpeechSynthesis && (
-              <button onClick={() => speakArabic(current.arabic)}
-                className="flex items-center gap-1 text-xs px-3 py-1 rounded-sm border gold-border hover:bg-gold/10 transition gold-text mb-2">
-                🔊 Hear Arabic
-              </button>
-            )}
+            <ArabicAudioButton text={current.arabic} className="mb-2" />
           </>
         )}
         <div className="text-[10px] text-gold-dim">{current.ref}</div>
@@ -2394,10 +2324,26 @@ function YusufFloatingChat({ open, onToggle }) {
   );
 }
 
+function useProphetStoriesProgress() {
+  const [completed, setCompleted] = useLocalStorage('completed_prophet_stories', []);
+  function markComplete(id) {
+    setCompleted(prev => prev.includes(id) ? prev : [...prev, id]);
+  }
+  function markIncomplete(id) {
+    setCompleted(prev => prev.filter(s => s !== id));
+  }
+  function reset() {
+    setCompleted([]);
+  }
+  return { completed, markComplete, markIncomplete, reset };
+}
+
 function ProphetsStoriesModal({ onClose, onSelectStory }) {
+  const { completed, markComplete, reset } = useProphetStoriesProgress();
+
   return (
     <Modal onClose={onClose}>
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-4">
         <div className="text-3xl">📖</div>
         <div>
           <div className="font-display text-3xl">Stories of the Prophets</div>
@@ -2405,16 +2351,38 @@ function ProphetsStoriesModal({ onClose, onSelectStory }) {
         </div>
       </div>
 
+      {/* Progress row */}
+      <div className="mb-4 p-3 rounded-sm border border-gold/20 flex items-center justify-between">
+        <div>
+          <div className="text-xs gold-text">{completed.length} of {PROPHETS.length} stories read</div>
+          <div className="h-1 rounded bg-gold/15 overflow-hidden mt-1 w-36">
+            <div className="h-full bg-gold transition-all" style={{ width: `${(completed.length / PROPHETS.length) * 100}%` }} />
+          </div>
+        </div>
+        {completed.length > 0 && (
+          <button onClick={() => { if (window.confirm('Reset all Prophet Stories progress?')) reset(); }}
+            className="text-xs text-rose-400 hover:underline">Reset</button>
+        )}
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        {PROPHETS.map(p => (
-          <button key={p.id} onClick={() => { onSelectStory(p); }}
-            className="p-4 rounded-sm border gold-border hover:bg-gold/5 transition text-left">
-            <div className="text-2xl mb-2">{p.icon}</div>
-            <div className="font-arabic text-lg gold-text">{p.nameArabic}</div>
-            <div className="font-display text-sm">{p.nameEnglish}</div>
-            <div className="text-[10px] text-gold-dim mt-1">&#x23F1; {p.readTime}</div>
-          </button>
-        ))}
+        {PROPHETS.map(p => {
+          const isDone = completed.includes(p.id);
+          return (
+            <button key={p.id} onClick={() => { onSelectStory(p); markComplete(p.id); }}
+              className={`relative p-4 rounded-sm border text-left transition ${isDone ? 'border-gold/40 bg-gold/8 opacity-75' : 'gold-border hover:bg-gold/5'}`}>
+              {isDone && (
+                <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-gold flex items-center justify-center">
+                  <Check className="w-3 h-3 text-midnight" />
+                </div>
+              )}
+              <div className="text-2xl mb-2">{p.icon}</div>
+              <div className="font-arabic text-lg gold-text">{p.nameArabic}</div>
+              <div className="font-display text-sm">{p.nameEnglish}</div>
+              <div className="text-[10px] text-gold-dim mt-1">&#x23F1; {p.readTime}</div>
+            </button>
+          );
+        })}
       </div>
 
       <div className="mt-6 text-[10px] text-gold-dim text-center italic">
@@ -2451,16 +2419,7 @@ function StoryDetailModal({ story, onClose }) {
       await ttsAudioRef.current.play();
       setIsPlaying(true);
     } catch {
-      // Fallback: Web Speech API
-      if (!hasSpeechSynthesis) return;
-      stopSpeaking();
-      const u = new SpeechSynthesisUtterance(story.story + ' Moral: ' + story.moral);
-      u.lang = 'en-US';
-      u.rate = 0.92;
-      u.onstart = () => setIsPlaying(true);
-      u.onend = () => setIsPlaying(false);
-      u.onerror = () => setIsPlaying(false);
-      setTimeout(() => window.speechSynthesis.speak(u), 50);
+      setIsPlaying(false);
     } finally {
       setLoadingTts(false);
     }
@@ -2515,6 +2474,108 @@ function StoryDetailModal({ story, onClose }) {
 
       <div className="text-[10px] text-gold-dim">
         Quranic references: {story.quranRefs.map(r => `Quran ${r}`).join(' · ')}
+      </div>
+    </Modal>
+  );
+}
+
+/* ============================================================
+   SEERAH SERIES — Life of the Prophet ﷺ with progress tracking
+   ============================================================ */
+
+const SEERAH_EPISODES = [
+  { id: 'se01', number: 1, title: 'The Arabian Peninsula Before Islam', duration: '~18 min', description: 'The social, political, and religious landscape of Arabia before the Prophet\'s birth. Tribal customs, trade, the Ka\'bah, and the spiritual darkness of Jahiliyyah.' },
+  { id: 'se02', number: 2, title: 'The Birth of Muhammad ﷺ', duration: '~20 min', description: 'The Year of the Elephant, the destruction of Abraha\'s army, and the miraculous birth of the Prophet ﷺ. His father Abdullah, mother Aminah, and grandfather Abdul Muttalib.' },
+  { id: 'se03', number: 3, title: 'Early Childhood and the Bedouin Years', duration: '~22 min', description: 'Life with his wet-nurse Halimah in the Bedouin tribe of Sa\'d. The opening of the chest (Sharh al-Sadr) and early signs of his prophethood.' },
+  { id: 'se04', number: 4, title: 'Orphanhood, Youth, and Character', duration: '~19 min', description: 'The deaths of his mother Aminah and grandfather Abdul Muttalib. Life under his uncle Abu Talib. His reputation as Al-Amin (the trustworthy) and Al-Sadiq (the truthful).' },
+  { id: 'se05', number: 5, title: 'Marriage to Khadijah (RA)', duration: '~17 min', description: 'The Prophet\'s trade journeys to Syria, his meeting with Khadijah bint Khuwaylid, and their marriage. The blessing of a loving, supportive partnership.' },
+  { id: 'se06', number: 6, title: 'The First Revelation — Iqra', duration: '~25 min', description: 'The Prophet\'s spiritual retreats in Cave Hira. The night of Laylat al-Qadr, Jibril\'s first appearance, and the first verses of Surah Al-Alaq. Khadijah\'s immediate support and Waraqah ibn Nawfal\'s testimony.' },
+  { id: 'se07', number: 7, title: 'The Early Believers', duration: '~21 min', description: 'The first Muslims: Khadijah, Ali, Zayd, and Abu Bakr (RA). The dawah in secret and the early community of faith.' },
+  { id: 'se08', number: 8, title: 'Public Preaching and Persecution', duration: '~24 min', description: 'The call to Islam goes public at Mount Safa. Qurayshi opposition, boycotts, torture of the early Muslims, and the steadfastness of Bilal, Sumayyah, and Yasir (RA).' },
+  { id: 'se09', number: 9, title: 'The Year of Grief — Abu Talib and Khadijah', duration: '~18 min', description: 'The devastating losses of his greatest protector Abu Talib and his beloved wife Khadijah in the same year. How the Prophet ﷺ endured the most difficult period of his life.' },
+  { id: 'se10', number: 10, title: 'The Night Journey — Isra and Mi\'raj', duration: '~28 min', description: 'The miraculous night journey from Makkah to Jerusalem and the ascent through the seven heavens. Meeting the prophets, seeing Paradise and Hell, and receiving the gift of five daily prayers.' },
+  { id: 'se11', number: 11, title: 'The Hijra to Madinah', duration: '~26 min', description: 'The migration to Madinah — one of the most consequential journeys in history. The Prophet\'s escape from assassination, the cave of Thawr, and the joyful reception in Madinah.' },
+  { id: 'se12', number: 12, title: 'Building the Madinah Community', duration: '~22 min', description: 'The Constitution of Madinah, brotherhood between the Muhajirun and Ansar, construction of the first mosque, and establishment of the Islamic state.' },
+  { id: 'se13', number: 13, title: 'Battle of Badr — The First Major Victory', duration: '~30 min', description: 'The turning point battle where 313 Muslims defeated an army of 1,000. The Prophet\'s du\'a, divine assistance, and the strategic brilliance that changed Islamic history.' },
+  { id: 'se14', number: 14, title: 'Battle of Uhud — Lessons in Adversity', duration: '~28 min', description: 'The near-victory that became a lesson. The archers who left their posts, the martyrdom of Hamzah (RA), and the Prophet\'s injury. Allah\'s wisdom in allowing trial.' },
+  { id: 'se15', number: 15, title: 'The Treaty of Hudaybiyyah', duration: '~23 min', description: 'The apparent diplomatic setback that was actually a great victory. The Prophet\'s wisdom in accepting terms that led to the peaceful conquest of Makkah two years later.' },
+  { id: 'se16', number: 16, title: 'The Conquest of Makkah', duration: '~25 min', description: 'The bloodless liberation of Makkah. The Prophet\'s mercy toward those who had persecuted him, his forgiveness of Abu Sufyan, and the cleansing of the Ka\'bah from idols.' },
+  { id: 'se17', number: 17, title: 'The Farewell Pilgrimage', duration: '~27 min', description: 'The Prophet\'s final Hajj in the 10th year of Hijra. The Farewell Sermon — a universal declaration of human rights, equality, and the completion of the religion.' },
+  { id: 'se18', number: 18, title: 'The Final Days and the Prophet\'s Legacy', duration: '~30 min', description: 'The Prophet\'s illness, his last visits to the mosque, and his passing on the 12th of Rabi al-Awwal. Abu Bakr\'s words: "Whoever worshipped Muhammad, Muhammad has died. Whoever worshipped Allah, He is Ever-Living."' },
+];
+
+function useSeerahProgress() {
+  const [completed, setCompleted] = useLocalStorage('completed_seerah', []);
+  function markComplete(id) {
+    setCompleted(prev => prev.includes(id) ? prev : [...prev, id]);
+  }
+  function markIncomplete(id) {
+    setCompleted(prev => prev.filter(ep => ep !== id));
+  }
+  function reset() {
+    setCompleted([]);
+  }
+  return { completed, markComplete, markIncomplete, reset };
+}
+
+function SeerahSeriesModal({ onClose }) {
+  const { completed, markComplete, markIncomplete, reset } = useSeerahProgress();
+
+  return (
+    <Modal onClose={onClose}>
+      <div className="flex items-center gap-3 mb-2">
+        <div className="text-3xl">🌙</div>
+        <div>
+          <div className="font-display text-3xl">Seerah Series</div>
+          <div className="text-xs text-gold-dim">Life of the Prophet Muhammad ﷺ · 18 episodes</div>
+        </div>
+      </div>
+
+      {/* Progress summary */}
+      <div className="mb-5 p-3 rounded-sm border border-gold/20 flex items-center justify-between">
+        <div>
+          <div className="text-sm gold-text font-display">{completed.length} of {SEERAH_EPISODES.length} episodes completed</div>
+          <div className="h-1.5 rounded bg-gold/15 overflow-hidden mt-1.5 w-48">
+            <div className="h-full bg-gold transition-all" style={{ width: `${(completed.length / SEERAH_EPISODES.length) * 100}%` }} />
+          </div>
+        </div>
+        {completed.length > 0 && (
+          <button onClick={() => { if (window.confirm('Reset all Seerah progress?')) reset(); }}
+            className="text-xs text-rose-400 hover:underline">Reset progress</button>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        {SEERAH_EPISODES.map(ep => {
+          const isDone = completed.includes(ep.id);
+          return (
+            <div key={ep.id}
+              className={`p-4 rounded-sm border transition ${isDone ? 'border-gold/40 bg-gold/8 opacity-75' : 'gold-border bg-transparent'}`}>
+              <div className="flex items-start gap-3">
+                <button
+                  onClick={() => isDone ? markIncomplete(ep.id) : markComplete(ep.id)}
+                  className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition ${
+                    isDone ? 'border-gold bg-gold text-midnight' : 'border-gold/40 hover:border-gold'
+                  }`}>
+                  {isDone && <Check className="w-3 h-3" />}
+                </button>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2 mb-0.5">
+                    <div className={`font-display text-base ${isDone ? 'line-through text-gold-dim' : ''}`}>
+                      {ep.number}. {ep.title}
+                    </div>
+                    <div className="text-[10px] text-gold-dim flex-shrink-0">{ep.duration}</div>
+                  </div>
+                  <div className="text-xs text-gold-dim leading-relaxed">{ep.description}</div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-5 text-[10px] text-gold-dim text-center italic">
+        This curriculum follows the authentic Seerah. For full audio, explore lectures by Sheikh Yasir Qadhi, Omar Suleiman, or Mufti Menk on their official channels. Tap the circle to mark episodes as completed.
       </div>
     </Modal>
   );
@@ -2717,12 +2778,7 @@ function DuaLibraryModal({ onClose }) {
                 <div className="text-xs text-gold-dim mb-2 italic">{d.context}</div>
                 <div className="flex items-center justify-between">
                   <div className="text-[10px] text-gold-dim">{d.source}</div>
-                  {hasSpeechSynthesis && (
-                    <button onClick={() => speakArabic(d.arabic)}
-                      className="flex items-center gap-1 text-xs px-3 py-1 rounded-sm border gold-border hover:bg-gold/10 transition gold-text">
-                      🔊 Hear Arabic
-                    </button>
-                  )}
+                  <ArabicAudioButton text={d.arabic} />
                 </div>
               </div>
             )}
@@ -2979,7 +3035,10 @@ function TodaysReflection() {
               <div className="font-arabic text-xl gold-text mb-3 leading-loose">{verse.arabic}</div>
               <div className="text-sm leading-relaxed mb-3">{verse.english}</div>
               <div className="flex items-center justify-between">
-                <div className="text-xs text-gold-dim">— {verse.citation}</div>
+                <div>
+                  <div className="text-xs text-gold-dim">— {verse.citation}</div>
+                  <div className="text-[10px] text-gold-dim/70 mt-0.5">Translation: Saheeh International</div>
+                </div>
                 {verse.audioUrl && (
                   <button onClick={toggleAudio}
                     className="flex items-center gap-1 text-xs px-3 py-1 rounded-sm border gold-border hover:bg-gold/10 transition gold-text">
@@ -3000,12 +3059,7 @@ function TodaysReflection() {
           <div className="font-arabic text-lg gold-text mb-3 leading-loose">{hadith.arabic}</div>
           <div className="text-sm leading-relaxed mb-3">{hadith.english}</div>
           <div className="text-xs text-gold-dim">— An-Nawawi's Forty Hadith · {hadith.source}</div>
-          {hasSpeechSynthesis && (
-            <button onClick={() => speakArabic(hadith.arabic)}
-              className="mt-3 flex items-center gap-1 text-xs px-3 py-1 rounded-sm border gold-border hover:bg-gold/10 transition gold-text">
-              🔊 Hear Arabic
-            </button>
-          )}
+          <ArabicAudioButton text={hadith.arabic} className="mt-3" />
         </div>
       </div>
     </div>
@@ -3161,65 +3215,41 @@ function TasbihCounter({ onClose, times }) {
 }
 
 /* ============================================================
-   TTS PLAY/STOP BUTTON — shared UI for Arabic audio playback
+   ARABIC AUDIO BUTTON — Google Cloud TTS, no browser Speech API
    ============================================================ */
 
-function TtsButton({ text, rate = 0.85 }) {
-  const [speaking, setSpeaking] = useState(false);
-  const hasArabicVoice = useHasArabicTts();
+function ArabicAudioButton({ text, label = '🔊 Hear Arabic', className = '' }) {
+  const [state, setState] = useState('idle'); // idle | loading | playing | error
 
-  useEffect(() => {
-    return () => stopSpeaking();
-  }, []);
+  useEffect(() => { return () => stopSpeaking(); }, []);
 
-  function handleToggle() {
-    if (speaking) {
-      stopSpeaking();
-      setSpeaking(false);
-    } else {
-      if (!hasSpeechSynthesis || !hasArabicVoice) return;
-      const u = speakArabic(text, rate);
-      if (u) {
-        u.onstart = () => setSpeaking(true);
-        u.onend = () => setSpeaking(false);
-        u.onerror = () => setSpeaking(false);
-      }
-    }
+  async function handleClick() {
+    if (state === 'playing') { stopSpeaking(); setState('idle'); return; }
+    if (state === 'loading') return;
+    setState('loading');
+    await speakArabicTts(text, {
+      onStart: () => setState('playing'),
+      onEnd: () => setState('idle'),
+      onError: () => setState('error'),
+    });
+    if (state === 'loading') setState('idle'); // fallback if onStart never fires
   }
 
-  if (!hasSpeechSynthesis) {
-    return (
-      <div className="flex items-center gap-2 px-4 py-2 rounded-sm border border-gold/15 text-gold-dim/50 text-xs italic">
-        Arabic audio not supported on this browser.
-      </div>
-    );
-  }
-
-  if (!hasArabicVoice) {
-    return (
-      <div className="flex items-start gap-2 px-4 py-2 rounded-sm border border-gold/20 bg-gold/5 text-xs text-gold-dim leading-relaxed">
-        <Volume2 className="w-4 h-4 mt-0.5 shrink-0 gold-text" />
-        <span>
-          Arabic pronunciation requires an Arabic voice pack installed on your device.
-          On Windows: <span className="gold-text">Settings → Time &amp; Language → Language → Arabic → Download</span>. On mobile it works automatically.
-        </span>
-      </div>
-    );
-  }
-
+  const base = 'flex items-center gap-1 text-xs px-3 py-1 rounded-sm border transition gold-text';
+  if (state === 'error') return (
+    <div className={`${base} border-rose-500/40 text-rose-300 ${className}`}>Audio unavailable</div>
+  );
   return (
-    <button onClick={handleToggle}
-      className={`flex items-center gap-2 px-4 py-2 rounded-sm border transition text-sm font-semibold ${
-        speaking
-          ? 'bg-rose-900/40 border-rose-500/60 text-rose-300 hover:bg-rose-900/60'
-          : 'bg-gold/10 border-gold/40 gold-text hover:bg-gold/20'
-      }`}>
-      {speaking
-        ? <><StopCircle className="w-4 h-4" /> Stop</>
-        : <><PlayCircle className="w-4 h-4" /> Listen to pronunciation</>
-      }
+    <button onClick={handleClick} disabled={state === 'loading'}
+      className={`${base} ${state === 'playing' ? 'bg-gold/20 border-gold' : 'gold-border hover:bg-gold/10'} ${className}`}>
+      {state === 'loading' ? '⏳ Loading…' : state === 'playing' ? '⏸ Stop' : label}
     </button>
   );
+}
+
+// Legacy TtsButton — now delegates to ArabicAudioButton
+function TtsButton({ text }) {
+  return <ArabicAudioButton text={text} label="Listen to pronunciation" className="px-4 py-2 text-sm font-semibold" />;
 }
 
 /* ============================================================
@@ -3296,11 +3326,9 @@ function AyatulKursiModal({ onClose }) {
       </div>
 
       {/* TTS button for Arabic pronunciation */}
-      {hasSpeechSynthesis && (
-        <div className="mb-4">
-          <TtsButton text={AYATUL_KURSI.text} />
-        </div>
-      )}
+      <div className="mb-4">
+        <TtsButton text={AYATUL_KURSI.text} />
+      </div>
 
       {/* Transliteration */}
       <details className="mb-4">
@@ -3705,8 +3733,8 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
       }, 1000);
     };
 
-    // Speak TTS dua for silent phases (only if Arabic voice available)
-    if (s.ttsDua && hasSpeechSynthesis && getArabicVoice()) {
+    // Speak TTS dua for silent phases — use Google Cloud TTS
+    if (s.ttsDua && false) { // disabled: now handled client-side via ArabicAudioButton
       const u = new SpeechSynthesisUtterance(s.ttsDua);
       u.lang = 'ar-SA';
       u.rate = spd * 0.85;
@@ -3944,12 +3972,7 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
                 <div className="font-arabic text-lg gold-text leading-loose text-right mb-2">{step.duaArabic}</div>
                 {step.duaTranslit && <div className="text-xs italic text-gold-dim mb-1">{step.duaTranslit}</div>}
                 {step.duaEnglish && <div className="text-xs leading-relaxed text-cream/80">{step.duaEnglish}</div>}
-                {hasSpeechSynthesis && getArabicVoice() && (
-                  <button onClick={() => speakArabic(step.duaArabic)}
-                    className="mt-2 flex items-center gap-1 text-xs px-3 py-1 rounded-sm border gold-border hover:bg-gold/10 transition gold-text">
-                    🔊 Hear Arabic
-                  </button>
-                )}
+                <ArabicAudioButton text={step.duaArabic} className="mt-2" />
               </div>
             )}
           </div>
