@@ -3048,25 +3048,25 @@ function TodaysReflection() {
   async function fetchVerse() {
     setVerseLoading(true);
     try {
-      const res = await fetch('https://api.quran.com/api/v4/verses/random?language=en&words=true&translations=131&fields=text_uthmani,chapter_id,verse_number');
+      // AlQuran.cloud — returns both Arabic (quran-uthmani) and English (en.sahih) in one call,
+      // no API key needed, reliably includes translation text
+      const res = await fetch('https://api.alquran.cloud/v1/ayah/random/editions/quran-uthmani,en.sahih');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const v = data.verse;
-      if (!v) throw new Error('No verse');
-      const chapterId = v.chapter_id;
-      const verseNum = v.verse_number;
-      const arabic = v.text_uthmani;
-      const english = v.translations?.[0]?.text?.replace(/<[^>]+>/g, '') || '';
-      // Build audio URL from everyayah.com
+      const [arVerse, enVerse] = data.data;
+      const arabic  = arVerse.text;
+      const english = enVerse.text;
+      const chapterId = arVerse.surah.number;
+      const verseNum   = arVerse.numberInSurah;
+      const surahName  = enVerse.surah.englishName || arVerse.surah.name;
       const chStr = String(chapterId).padStart(3, '0');
-      const vStr = String(verseNum).padStart(3, '0');
+      const vStr  = String(verseNum).padStart(3, '0');
       const audioUrl = `https://everyayah.com/data/Alafasy_128kbps/${chStr}${vStr}.mp3`;
-      const surahNames = ['Al-Fatihah','Al-Baqarah','Ali \'Imran','An-Nisa','Al-Maidah','Al-An\'am','Al-A\'raf','Al-Anfal','At-Tawbah','Yunus','Hud','Yusuf','Ar-Ra\'d','Ibrahim','Al-Hijr','An-Nahl','Al-Isra','Al-Kahf','Maryam','Ta-Ha','Al-Anbiya','Al-Hajj','Al-Mu\'minun','An-Nur','Al-Furqan','Ash-Shu\'ara','An-Naml','Al-Qasas','Al-\'Ankabut','Ar-Rum','Luqman','As-Sajdah','Al-Ahzab','Saba','Fatir','Ya-Sin','As-Saffat','Sad','Az-Zumar','Ghafir','Fussilat','Ash-Shura','Az-Zukhruf','Ad-Dukhan','Al-Jathiyah','Al-Ahqaf','Muhammad','Al-Fath','Al-Hujurat','Qaf','Adh-Dhariyat','At-Tur','An-Najm','Al-Qamar','Ar-Rahman','Al-Waqiah','Al-Hadid','Al-Mujadila','Al-Hashr','Al-Mumtahanah','As-Saf','Al-Jumu\'ah','Al-Munafiqun','At-Taghabun','At-Talaq','At-Tahrim','Al-Mulk','Al-Qalam','Al-Haqqah','Al-Ma\'arij','Nuh','Al-Jinn','Al-Muzzammil','Al-Muddaththir','Al-Qiyamah','Al-Insan','Al-Mursalat','An-Naba','An-Nazi\'at','Abasa','At-Takwir','Al-Infitar','Al-Mutaffifin','Al-Inshiqaq','Al-Buruj','At-Tariq','Al-A\'la','Al-Ghashiyah','Al-Fajr','Al-Balad','Ash-Shams','Al-Layl','Ad-Duha','Ash-Sharh','At-Tin','Al-\'Alaq','Al-Qadr','Al-Bayyinah','Az-Zalzalah','Al-\'Adiyat','Al-Qari\'ah','At-Takathur','Al-\'Asr','Al-Humazah','Al-Fil','Quraysh','Al-Ma\'un','Al-Kawthar','Al-Kafirun','An-Nasr','Al-Masad','Al-Ikhlas','Al-Falaq','An-Nas'];
-      const surahName = surahNames[chapterId - 1] || `Surah ${chapterId}`;
-      const newVerse = { arabic, english, citation: `${surahName} ${chapterId}:${verseNum}`, audioUrl };
-      setVerse(newVerse);
+      setVerse({ arabic, english, citation: `${surahName} ${chapterId}:${verseNum}`, audioUrl });
       setVerseDateKey(todayKey);
-    } catch {
-      // silently fail — keep old verse if cached
+    } catch (e) {
+      console.error('fetchVerse error:', e);
+      // Only keep old cache if it has usable English text; otherwise leave loading=false with null
     } finally {
       setVerseLoading(false);
     }
@@ -3571,10 +3571,20 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
   const [autoCountdown, setAutoCountdown] = useState(0);
   const [autoDuration, setAutoDuration] = useState(0);
   const [prayerComplete, setPrayerComplete] = useState(false);
-  // Multi-track state for Tashahhud + Durood + Dua sequential playback
+  // Multi-track state for auto-play sequential playback
   const [multiTrackIdx, setMultiTrackIdx] = useState(0);
   const [multiTrackLabel, setMultiTrackLabel] = useState('');
   const [audioUnavailable, setAudioUnavailable] = useState(false);
+  // Manual mode: which group button is actively playing (null | 0 | 1 | 2)
+  const [manualGroupPlaying, setManualGroupPlaying] = useState(null);
+
+  // Manual-mode button groups for the Tashahhud step
+  // Each group maps to indices within step.multiAudio
+  const MANUAL_GROUPS = [
+    { label: 'At-Tahiyyat', sublabel: 'Tashahhud', indices: [0] },
+    { label: 'Durood Ibrahim', sublabel: 'Salawat upon the Prophet ﷺ', indices: [1] },
+    { label: 'Dua', sublabel: 'Surah Ibrahim 14:40–41', indices: [2, 3] },
+  ];
 
   const autoWakeLockRef = useRef(null);
   const autoStepTimerRef = useRef(null);
@@ -3911,15 +3921,13 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
       .catch(() => { setIsPlaying(false); setAudioUnavailable(true); });
   }
 
+  // Play a single-button track (non-multiAudio steps)
   function togglePlay() {
     if (isPlaying) {
       audioRef.current?.pause();
       if (audioRef.current) { audioRef.current.onended = null; audioRef.current.onerror = null; }
       setIsPlaying(false);
       setMultiTrackLabel('');
-    } else if (step.multiAudio && audioRef.current) {
-      setAudioUnavailable(false);
-      playMultiTrackManual(0);
     } else if (step.audio && audioRef.current) {
       setAudioUnavailable(false);
       audioRef.current.src = step.audio;
@@ -3931,6 +3939,52 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
     }
   }
 
+  // Play one of the 3 manual groups (Tashahhud / Durood / Dua)
+  // In auto-play mode this is never called — auto-play uses runAutoStep's multiAudio chain
+  function playGroup(groupIdx) {
+    if (!step.multiAudio || !audioRef.current) return;
+    const group = MANUAL_GROUPS[groupIdx];
+
+    // Toggle off if same group already playing
+    if (manualGroupPlaying === groupIdx && isPlaying) {
+      audioRef.current.pause();
+      audioRef.current.onended = null;
+      audioRef.current.onerror = null;
+      setIsPlaying(false);
+      setManualGroupPlaying(null);
+      return;
+    }
+
+    // Stop whatever is currently playing
+    audioRef.current.pause();
+    audioRef.current.onended = null;
+    audioRef.current.onerror = null;
+    setAudioUnavailable(false);
+    setManualGroupPlaying(groupIdx);
+
+    function playAt(pos) {
+      if (pos >= group.indices.length) {
+        setIsPlaying(false);
+        setManualGroupPlaying(null);
+        return;
+      }
+      const track = step.multiAudio[group.indices[pos]];
+      audioRef.current.src = track.url;
+      audioRef.current.playbackRate = speed;
+      audioRef.current.onended = () => setTimeout(() => playAt(pos + 1), 400);
+      audioRef.current.onerror = () => {
+        setIsPlaying(false);
+        setManualGroupPlaying(null);
+        setAudioUnavailable(true);
+      };
+      audioRef.current.play()
+        .then(() => setIsPlaying(true))
+        .catch(() => { setIsPlaying(false); setManualGroupPlaying(null); setAudioUnavailable(true); });
+    }
+
+    playAt(0);
+  }
+
   function next() {
     audioRef.current?.pause();
     if (audioRef.current) { audioRef.current.onended = null; audioRef.current.onerror = null; }
@@ -3939,6 +3993,7 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
     setMultiTrackIdx(0);
     multiTrackIdxRef.current = 0;
     setAudioUnavailable(false);
+    setManualGroupPlaying(null);
     setCurrentStep(Math.min(currentStep + 1, steps.length - 1));
   }
 
@@ -3950,6 +4005,7 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
     setMultiTrackIdx(0);
     multiTrackIdxRef.current = 0;
     setAudioUnavailable(false);
+    setManualGroupPlaying(null);
     setCurrentStep(Math.max(currentStep - 1, 0));
   }
 
@@ -4088,13 +4144,13 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
             </div>
           )}
 
-          {/* Manual mode audio control */}
-          {!autoPlay && (step.audio || step.multiAudio) && (
+          {/* Manual mode — single-track step */}
+          {!autoPlay && step.audio && !step.multiAudio && (
             <div className="mt-4 p-4 rounded-sm border border-gold/20">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm">
                   <Volume2 className="w-4 h-4 gold-text" />
-                  <span>{step.multiAudio ? 'Beautifully recited audio' : 'Recitation available'}</span>
+                  <span>Recitation available</span>
                 </div>
                 <button onClick={togglePlay}
                   className="px-4 py-2 rounded-sm bg-gold text-midnight font-semibold flex items-center gap-2 hover:bg-gold-bright transition">
@@ -4102,26 +4158,40 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
                   {isPlaying ? 'Pause' : 'Play'}
                 </button>
               </div>
-              {/* Multi-track label and dots in manual mode */}
-              {step.multiAudio && isPlaying && (
-                <div className="mt-3">
-                  <div className="flex gap-1.5 mb-1.5">
-                    {step.multiAudio.map((t, i) => (
-                      <div key={i} title={t.label}
-                        className={`flex-1 h-1 rounded-full transition-all ${i <= multiTrackIdx ? 'bg-gold' : 'bg-gold/20'}`} />
-                    ))}
-                  </div>
-                  {multiTrackLabel && <div className="text-xs text-gold-dim italic">{multiTrackLabel}</div>}
-                </div>
-              )}
-              {step.multiAudio && !isPlaying && !audioUnavailable && (
-                <div className="mt-2 text-[10px] text-gold-dim italic">
-                  Plays: At-Tahiyyat → Durood Ibrahim → Dua (Ibrahim 14:40–41) — beautifully recited
-                </div>
-              )}
               {audioUnavailable && (
                 <div className="mt-2 px-3 py-2 rounded-sm border border-amber-500/40 bg-amber-900/20 text-amber-300 text-xs">
-                  Audio unavailable — audio file not yet added. Add MP3 to <code>public/audio/prayer/</code> and refresh.
+                  Audio unavailable — file missing from <code>public/audio/prayer/</code>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Manual mode — Tashahhud multi-track: 3 individual buttons */}
+          {!autoPlay && step.multiAudio && (
+            <div className="mt-4 p-4 rounded-sm border border-gold/20 space-y-2">
+              <div className="flex items-center gap-2 text-xs uppercase tracking-widest gold-text mb-3">
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>Listen to each section</span>
+              </div>
+              {MANUAL_GROUPS.map((group, gi) => {
+                const active = manualGroupPlaying === gi && isPlaying;
+                return (
+                  <button key={gi} onClick={() => playGroup(gi)}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-sm border transition ${active ? 'bg-gold text-midnight border-gold' : 'gold-border hover:bg-gold/10'}`}>
+                    <div className="text-left">
+                      <div className="font-semibold text-sm">{group.label}</div>
+                      <div className={`text-xs mt-0.5 ${active ? 'text-midnight/70' : 'text-gold-dim'}`}>{group.sublabel}</div>
+                    </div>
+                    <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+                      {active && <span className="text-xs font-medium">Playing…</span>}
+                      {active ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                    </div>
+                  </button>
+                );
+              })}
+              {audioUnavailable && (
+                <div className="px-3 py-2 rounded-sm border border-amber-500/40 bg-amber-900/20 text-amber-300 text-xs">
+                  Audio unavailable — file missing from <code>public/audio/prayer/</code>
                 </div>
               )}
             </div>
