@@ -500,6 +500,8 @@ export default function App() {
   const [openMosques, setOpenMosques] = useState(false);
   const [openStories, setOpenStories] = useState(false);
   const [openStory, setOpenStory] = useState(null);
+  const [openWudu, setOpenWudu] = useState(false);
+  const [openChatbot, setOpenChatbot] = useState(false);
   const [guidedRakats, setGuidedRakats] = useState(2);
 
   const adhanAudioRef = useRef(null);
@@ -913,6 +915,18 @@ export default function App() {
                   <div className="font-display text-lg mb-1">Prophets' Stories</div>
                   <div className="text-xs text-gold-dim">Stories from the Quran</div>
                 </button>
+                <button onClick={() => setOpenWudu(true)}
+                  className="p-5 rounded-sm border gold-border text-left hover:bg-gold/5 transition">
+                  <div className="text-2xl mb-2">💧</div>
+                  <div className="font-display text-lg mb-1">Wudu Guide</div>
+                  <div className="text-xs text-gold-dim">Step-by-step purification</div>
+                </button>
+                <button onClick={() => setOpenChatbot(true)}
+                  className="p-5 rounded-sm border gold-border text-left hover:bg-gold/5 transition">
+                  <div className="text-2xl mb-2">💬</div>
+                  <div className="font-display text-lg mb-1">Ask About Islam</div>
+                  <div className="text-xs text-gold-dim">AI-powered Q&A</div>
+                </button>
               </div>
             </div>
 
@@ -1059,6 +1073,14 @@ export default function App() {
         )}
         {openStory && (
           <StoryDetailModal story={openStory} onClose={() => setOpenStory(null)} />
+        )}
+
+        {openWudu && (
+          <WuduGuideModal onClose={() => setOpenWudu(false)} />
+        )}
+
+        {openChatbot && (
+          <IslamicChatbotModal onClose={() => setOpenChatbot(false)} />
         )}
 
         {/* Settings modal */}
@@ -1691,6 +1713,341 @@ He passed from this world at 63, having delivered the complete message. His last
     moral: "The Prophet is the best example for all of humanity. His life teaches us: be honest, be patient, be forgiving, love people, and hold fast to the Quran and Sunnah. He is Allah's mercy to all the worlds (21:107).",
   },
 ];
+
+/* ============================================================
+   WUDU GUIDE — 13-step interactive ablution guide
+   ============================================================ */
+
+const WUDU_STEPS = [
+  { num: 1, title: 'Intention (Niyyah)', arabic: '', translit: '', instruction: 'Make the intention in your heart to perform wudu for the sake of Allah. The intention is silent — it is a resolve in the heart, not spoken aloud.', times: 0, ref: 'Bukhari 1 — "Actions are judged by intentions"' },
+  { num: 2, title: 'Bismillah', arabic: 'بِسْمِ اللَّهِ', translit: 'Bismillah', instruction: 'Say "Bismillah" (In the name of Allah) before beginning.', times: 1, ref: 'Abu Dawud 101 — saying Bismillah is sunnah before wudu' },
+  { num: 3, title: 'Wash Hands', arabic: '', translit: '', instruction: 'Wash both hands up to and including the wrists, starting with the right hand. Rub between the fingers.', times: 3, ref: 'Bukhari 159 — from the description of the Prophet\'s wudu' },
+  { num: 4, title: 'Rinse Mouth', arabic: '', translit: '', instruction: 'Take water in your right hand, rinse your mouth thoroughly, and spit it out. Rub your teeth with your finger if no miswak is available.', times: 3, ref: 'Bukhari 159' },
+  { num: 5, title: 'Sniff Water (Istinshaq)', arabic: '', translit: '', instruction: 'Using the right hand, sniff water into both nostrils, then blow out with the left hand. Clean the nostrils gently.', times: 3, ref: 'Bukhari 159 — sniffing and blowing out was the Prophet\'s practice' },
+  { num: 6, title: 'Wash Face', arabic: '', translit: '', instruction: 'Wash the entire face — from the top of the forehead (where hair begins) to the chin, and from ear to ear. Rub water through the beard.', times: 3, ref: 'Quran 5:6 — "Wash your faces"' },
+  { num: 7, title: 'Wash Right Arm', arabic: '', translit: '', instruction: 'Wash the right arm from fingertips up to and including the elbow. Rub water between the fingers and over the entire arm.', times: 3, ref: 'Quran 5:6 — "And your arms up to the elbows"' },
+  { num: 8, title: 'Wash Left Arm', arabic: '', translit: '', instruction: 'Wash the left arm from fingertips up to and including the elbow. Same as the right arm.', times: 3, ref: 'Quran 5:6' },
+  { num: 9, title: 'Wipe Head (Masah)', arabic: '', translit: '', instruction: 'Wet both hands and wipe them over the head — move from the front to the back, then back to the front. Done once only.', times: 1, ref: 'Quran 5:6 — "And wipe your heads" · Bukhari 185' },
+  { num: 10, title: 'Wipe Ears', arabic: '', translit: '', instruction: 'Using the same water as the head wipe: insert index fingers into the ear canals and wipe the outer ear with thumbs. Done once.', times: 1, ref: 'Abu Dawud 130 — ears are part of the head' },
+  { num: 11, title: 'Wash Right Foot', arabic: '', translit: '', instruction: 'Wash the right foot up to and including the ankle. Rub between the toes with the little finger of the left hand.', times: 3, ref: 'Quran 5:6 — "And your feet up to the ankles" · Bukhari 160' },
+  { num: 12, title: 'Wash Left Foot', arabic: '', translit: '', instruction: 'Wash the left foot up to and including the ankle. Same as the right foot.', times: 3, ref: 'Quran 5:6 · Bukhari 160' },
+  { num: 13, title: 'Post-Wudu Dua', arabic: 'أَشْهَدُ أَنْ لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، وَأَشْهَدُ أَنَّ مُحَمَّدًا عَبْدُهُ وَرَسُولُهُ', translit: 'Ash-hadu an la ilaha illallahu wahdahu la sharika lah, wa ash-hadu anna Muhammadan \'abduhu wa rasuluh', instruction: 'Recite the post-wudu supplication. The Prophet ﷺ said: "Whoever performs wudu and says this, all eight gates of Paradise will be opened for him."', times: 1, ref: 'Muslim 234' },
+];
+
+function WuduGuideModal({ onClose }) {
+  const [step, setStep] = useState(0);
+  const [autoPlay, setAutoPlay] = useState(false);
+  const [done, setDone] = useState(false);
+  const timerRef = useRef(null);
+
+  const current = WUDU_STEPS[step];
+  const isLast = step === WUDU_STEPS.length - 1;
+
+  function next() {
+    if (isLast) { setDone(true); return; }
+    setStep(s => s + 1);
+  }
+
+  function prev() {
+    if (step > 0) setStep(s => s - 1);
+  }
+
+  function startAuto() {
+    setAutoPlay(true);
+    scheduleNext();
+  }
+
+  function scheduleNext() {
+    timerRef.current = setTimeout(() => {
+      setStep(prev => {
+        if (prev >= WUDU_STEPS.length - 1) { setAutoPlay(false); setDone(true); return prev; }
+        scheduleNext();
+        return prev + 1;
+      });
+    }, 8000);
+  }
+
+  function stopAuto() {
+    setAutoPlay(false);
+    clearTimeout(timerRef.current);
+  }
+
+  useEffect(() => {
+    return () => clearTimeout(timerRef.current);
+  }, []);
+
+  if (done) {
+    return (
+      <Modal onClose={onClose}>
+        <div className="text-center py-8">
+          <div className="text-4xl mb-4">💧</div>
+          <div className="font-display text-3xl gold-text mb-2">Wudu Complete</div>
+          <div className="text-sm text-gold-dim mb-2">May Allah accept your purification.</div>
+          <div className="font-arabic text-xl gold-text mb-6">الحمد لله</div>
+          <div className="p-4 rounded-sm border gold-border text-xs text-gold-dim text-left mb-6">
+            <div className="font-semibold mb-2 gold-text">Wudu is invalidated by:</div>
+            Going to the bathroom, passing gas, deep sleep, loss of consciousness, or direct contact with private parts. In these cases, wudu must be renewed before prayer.
+          </div>
+          <button onClick={() => { setDone(false); setStep(0); setAutoPlay(false); }}
+            className="px-6 py-3 rounded-sm bg-gold text-midnight font-semibold hover:bg-gold-bright transition">
+            Start Over
+          </button>
+        </div>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal onClose={() => { stopAuto(); onClose(); }}>
+      <div className="flex items-center gap-3 mb-2">
+        <div className="text-3xl">💧</div>
+        <div>
+          <div className="font-display text-3xl">Wudu Guide</div>
+          <div className="text-xs text-gold-dim">Step-by-step purification</div>
+        </div>
+      </div>
+
+      {/* Progress */}
+      <div className="mb-4">
+        <div className="flex justify-between text-xs text-gold-dim mb-1">
+          <span>Step {step + 1} of {WUDU_STEPS.length}</span>
+          <span>{Math.round(((step + 1) / WUDU_STEPS.length) * 100)}%</span>
+        </div>
+        <div className="h-1.5 rounded bg-gold/10 overflow-hidden">
+          <div className="h-full bg-gold transition-all" style={{ width: `${((step + 1) / WUDU_STEPS.length) * 100}%` }}></div>
+        </div>
+      </div>
+
+      {/* Step card */}
+      <div className="p-5 rounded-sm border gold-border mb-4" style={{ background: 'rgba(212,175,55,0.04)' }}>
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-8 h-8 rounded-full bg-gold text-midnight flex items-center justify-center text-sm font-bold flex-shrink-0">{current.num}</div>
+          <div className="font-display text-xl">{current.title}</div>
+        </div>
+        {current.times > 0 && (
+          <div className="text-xs uppercase tracking-widest gold-text mb-3">
+            {current.times === 1 ? 'Once' : `${current.times} times`}
+          </div>
+        )}
+        <div className="text-sm leading-relaxed mb-3">{current.instruction}</div>
+        {current.arabic && (
+          <>
+            <div className="font-arabic text-lg gold-text leading-loose mb-1">{current.arabic}</div>
+            <div className="text-xs text-gold-dim italic mb-3">{current.translit}</div>
+            {hasSpeechSynthesis && (
+              <button onClick={() => speakArabic(current.arabic)}
+                className="flex items-center gap-1 text-xs px-3 py-1 rounded-sm border gold-border hover:bg-gold/10 transition gold-text mb-2">
+                🔊 Hear Arabic
+              </button>
+            )}
+          </>
+        )}
+        <div className="text-[10px] text-gold-dim">{current.ref}</div>
+      </div>
+
+      {/* Auto-play controls */}
+      {!autoPlay ? (
+        <button onClick={startAuto}
+          className="w-full py-2 rounded-sm border gold-border hover:bg-gold/10 transition text-sm gold-text mb-3">
+          ▶ Auto-advance (8s per step)
+        </button>
+      ) : (
+        <button onClick={stopAuto}
+          className="w-full py-2 rounded-sm border border-rose-500/40 bg-rose-900/20 text-rose-300 hover:bg-rose-900/40 transition text-sm mb-3">
+          ⏹ Stop Auto-advance
+        </button>
+      )}
+
+      {/* Manual navigation */}
+      <div className="flex gap-2">
+        <button onClick={prev} disabled={step === 0}
+          className="flex-1 py-3 rounded-sm border gold-border hover:bg-gold/10 transition disabled:opacity-30 text-sm">
+          ← Previous
+        </button>
+        <button onClick={next}
+          className="flex-1 py-3 rounded-sm bg-gold text-midnight font-semibold hover:bg-gold-bright transition text-sm">
+          {isLast ? 'Complete ✓' : 'Next →'}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+/* ============================================================
+   ISLAMIC CHATBOT — Ask About Islam
+   ============================================================ */
+
+const WELCOME_MSG = {
+  role: 'assistant',
+  content: `Bismillah — In the name of Allah, the Most Gracious, the Most Merciful.
+
+As-salamu alaykum! I'm here to help you learn about Islam — the Quran, Hadith, Islamic history, beliefs, practices, and ethics.
+
+I'm not a scholar or mufti, so for personal rulings please consult a qualified local imam. But I'm happy to answer general questions and share what the scholars have said.
+
+Try one of these to get started:`
+};
+
+const STARTERS = [
+  'What are the pillars of Islam?',
+  'Tell me about Surah Al-Fatiha',
+  'How should I prepare for Ramadan?',
+  'What are the etiquettes of making dua?',
+];
+
+function IslamicChatbotModal({ onClose }) {
+  const [messages, setMessages] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pc_chat_history');
+      return saved ? JSON.parse(saved) : [WELCOME_MSG];
+    } catch { return [WELCOME_MSG]; }
+  });
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const bottomRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pc_chat_history', JSON.stringify(messages));
+    } catch {}
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const userMessages = messages.filter(m => m.role === 'user');
+  const atLimit = userMessages.length >= 20;
+
+  async function send(text) {
+    if (!text.trim() || loading || atLimit) return;
+    const userMsg = { role: 'user', content: text.trim() };
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
+    setInput('');
+    setLoading(true);
+    setError(null);
+    try {
+      const apiMessages = newMessages.filter(m => m.role !== 'assistant' || messages.indexOf(m) > 0)
+        .map(m => ({ role: m.role, content: m.content }));
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: apiMessages.filter(m => m.role === 'user' || m.role === 'assistant') }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Request failed');
+      }
+      const data = await res.json();
+      setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
+    } catch (e) {
+      setError(e.message || 'Failed to reach assistant. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); }
+  }
+
+  function newConversation() {
+    setMessages([WELCOME_MSG]);
+    setInput('');
+    setError(null);
+    localStorage.removeItem('pc_chat_history');
+  }
+
+  function hasArabic(text) { return /[\u0600-\u06FF]/.test(text); }
+
+  return (
+    <Modal onClose={onClose}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="text-2xl">💬</div>
+          <div>
+            <div className="font-display text-2xl">Ask About Islam</div>
+            <div className="text-xs text-gold-dim">Powered by AI · Not a scholarly ruling</div>
+          </div>
+        </div>
+        <button onClick={newConversation} className="text-xs px-3 py-1 rounded-sm border gold-border hover:bg-gold/10 transition gold-text">
+          New Chat
+        </button>
+      </div>
+
+      {/* Chat window */}
+      <div className="h-80 overflow-y-auto mb-4 space-y-3 pr-1">
+        {messages.map((m, i) => (
+          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[85%] rounded-sm px-4 py-3 text-sm ${
+              m.role === 'user'
+                ? 'bg-gold text-midnight font-medium'
+                : 'border gold-border text-cream'
+            }`} style={m.role === 'assistant' ? { background: 'rgba(212,175,55,0.05)' } : {}}>
+              {m.role === 'assistant' ? (
+                <div className="prose prose-sm max-w-none">
+                  {m.content.split('\n').map((line, li) => (
+                    <p key={li} className={`mb-1 ${hasArabic(line) ? 'font-arabic text-right text-base gold-text leading-loose' : ''}`}>
+                      {line}
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <span>{m.content}</span>
+              )}
+            </div>
+          </div>
+        ))}
+        {/* Starter chips — only show if only welcome message */}
+        {messages.length === 1 && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {STARTERS.map(s => (
+              <button key={s} onClick={() => send(s)}
+                className="text-xs px-3 py-1.5 rounded-full border gold-border hover:bg-gold/10 transition gold-text">
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+        {loading && (
+          <div className="flex justify-start">
+            <div className="px-4 py-3 rounded-sm border gold-border text-xs text-gold-dim" style={{ background: 'rgba(212,175,55,0.05)' }}>
+              Thinking...
+            </div>
+          </div>
+        )}
+        {error && (
+          <div className="text-xs text-rose-400 text-center py-2">{error}</div>
+        )}
+        {atLimit && (
+          <div className="text-center text-xs text-gold-dim py-2">
+            Conversation limit reached. <button onClick={newConversation} className="underline gold-text">Start a new chat</button>
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input */}
+      <div className="flex gap-2 mb-2">
+        <textarea
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={handleKey}
+          placeholder="Ask about Islam..."
+          rows={2}
+          disabled={loading || atLimit}
+          className="flex-1 px-3 py-2 bg-transparent border gold-border rounded-sm text-cream placeholder-gold-dim/60 focus:outline-none focus:border-gold text-sm resize-none disabled:opacity-50"
+        />
+        <button onClick={() => send(input)} disabled={loading || !input.trim() || atLimit}
+          className="px-4 rounded-sm bg-gold text-midnight font-semibold hover:bg-gold-bright transition disabled:opacity-40 disabled:cursor-not-allowed text-sm">
+          Send
+        </button>
+      </div>
+      <div className="text-[10px] text-gold-dim text-center">
+        This assistant provides general information. For personal rulings, consult a qualified scholar.
+      </div>
+    </Modal>
+  );
+}
 
 function ProphetsStoriesModal({ onClose, onSelectStory }) {
   return (
