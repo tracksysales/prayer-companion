@@ -442,6 +442,7 @@ export default function App() {
   const [openIstikharah, setOpenIstikharah] = useState(false);
   const [openGuided, setOpenGuided] = useState(false);
   const [openQibla, setOpenQibla] = useState(false);
+  const [openTasbih, setOpenTasbih] = useState(false);
   const [guidedRakats, setGuidedRakats] = useState(2);
 
   const adhanAudioRef = useRef(null);
@@ -810,6 +811,12 @@ export default function App() {
                   <div className="font-display text-lg mb-1">Qibla</div>
                   <div className="text-xs text-gold-dim">Direction of prayer</div>
                 </button>
+                <button onClick={() => setOpenTasbih(true)}
+                  className="p-5 rounded-sm border gold-border text-left hover:bg-gold/5 transition">
+                  <div className="text-2xl mb-2">📿</div>
+                  <div className="font-display text-lg mb-1">Tasbih</div>
+                  <div className="text-xs text-gold-dim">Dhikr counter</div>
+                </button>
               </div>
             </div>
 
@@ -933,6 +940,10 @@ export default function App() {
 
         {openQibla && (
           <QiblaCompass location={location} onClose={() => setOpenQibla(false)} />
+        )}
+
+        {openTasbih && (
+          <TasbihCounter onClose={() => setOpenTasbih(false)} times={times} />
         )}
 
         {/* Settings modal */}
@@ -1174,6 +1185,172 @@ function QiblaCompass({ location, onClose }) {
       <div className="text-[10px] text-gold-dim text-center italic mt-2">
         Qibla direction calculated using haversine formula from your location to the Kaaba, Makkah (21.4225°N, 39.8262°E).
       </div>
+    </Modal>
+  );
+}
+
+/* ============================================================
+   TASBIH COUNTER
+   ============================================================ */
+
+const DHIKR_PRESETS = [
+  { id: 'subhanallah', arabic: 'سُبْحَانَ اللَّهِ', translit: 'SubhanAllah', meaning: 'Glory be to Allah', target: 33 },
+  { id: 'alhamdulillah', arabic: 'الْحَمْدُ لِلَّهِ', translit: 'Alhamdulillah', meaning: 'All praise is for Allah', target: 33 },
+  { id: 'allahuakbar', arabic: 'اللَّهُ أَكْبَرُ', translit: 'Allahu Akbar', meaning: 'Allah is the Greatest', target: 34 },
+  { id: 'astaghfirullah', arabic: 'أَسْتَغْفِرُ اللَّهَ', translit: 'Astaghfirullah', meaning: 'I seek forgiveness from Allah', target: 100 },
+  { id: 'lailaha', arabic: 'لَا إِلَٰهَ إِلَّا اللَّهُ', translit: 'La ilaha illa Allah', meaning: 'There is no god but Allah', target: 100 },
+  { id: 'salawat', arabic: 'اللَّهُمَّ صَلِّ عَلَى مُحَمَّد', translit: 'Allahumma salli ala Muhammad', meaning: 'O Allah, send blessings on Muhammad', target: 10 },
+];
+
+function getTodayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function TasbihCounter({ onClose, times }) {
+  const [selectedId, setSelectedId] = useState('subhanallah');
+  const [customTarget, setCustomTarget] = useState(33);
+  const [isCustom, setIsCustom] = useState(false);
+  const [pulse, setPulse] = useState(false);
+  const [justCompleted, setJustCompleted] = useState(false);
+
+  const todayKey = getTodayKey();
+
+  // Counts stored per dhikr per day: { 'subhanallah_2024-1-15': 12, ... }
+  const [counts, setCounts] = useLocalStorage('pc_tasbih_counts', {});
+  const [lifetimeTotal, setLifetimeTotal] = useLocalStorage('pc_tasbih_lifetime', 0);
+
+  const dhikr = isCustom
+    ? { id: 'custom', arabic: '', translit: 'Custom Dhikr', meaning: 'Your personal dhikr', target: customTarget }
+    : DHIKR_PRESETS.find(d => d.id === selectedId);
+
+  const countKey = `${dhikr.id}_${todayKey}`;
+  const currentCount = counts[countKey] || 0;
+  const todayTotal = Object.entries(counts)
+    .filter(([k]) => k.endsWith(todayKey))
+    .reduce((sum, [, v]) => sum + v, 0);
+
+  const target = dhikr.target;
+  const progress = Math.min(currentCount / target, 1);
+  const isComplete = currentCount >= target;
+
+  // SVG ring params
+  const R = 54;
+  const circumference = 2 * Math.PI * R;
+  const strokeDashoffset = circumference * (1 - progress);
+
+  function tap() {
+    if (navigator.vibrate) navigator.vibrate(30);
+    const newCount = currentCount + 1;
+    setCounts(prev => ({ ...prev, [countKey]: newCount }));
+    setLifetimeTotal(prev => prev + 1);
+    setPulse(true);
+    setTimeout(() => setPulse(false), 150);
+    if (newCount === target) {
+      setJustCompleted(true);
+      setTimeout(() => setJustCompleted(false), 2000);
+    }
+  }
+
+  function resetConfirm() {
+    if (window.confirm(`Reset count for ${dhikr.translit}?`)) {
+      setCounts(prev => ({ ...prev, [countKey]: 0 }));
+      setJustCompleted(false);
+    }
+  }
+
+  return (
+    <Modal onClose={onClose}>
+      <div className="flex items-center gap-3 mb-6">
+        <div className="text-3xl">📿</div>
+        <div>
+          <div className="font-display text-3xl">Tasbih</div>
+          <div className="text-xs text-gold-dim">Dhikr counter · Counts reset daily</div>
+        </div>
+      </div>
+
+      {/* Dhikr selector */}
+      <div className="mb-6">
+        <div className="text-xs uppercase tracking-widest gold-text mb-2">Select Dhikr</div>
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          {DHIKR_PRESETS.map(d => (
+            <button key={d.id} onClick={() => { setSelectedId(d.id); setIsCustom(false); setJustCompleted(false); }}
+              className={`p-2 rounded-sm border text-left text-xs transition ${selectedId === d.id && !isCustom ? 'bg-gold text-midnight border-gold font-semibold' : 'gold-border hover:bg-gold/10'}`}>
+              <div className="font-arabic text-sm">{d.arabic}</div>
+              <div className="text-[10px]">{d.translit} · {d.target}</div>
+            </button>
+          ))}
+          <button onClick={() => { setIsCustom(true); setJustCompleted(false); }}
+            className={`p-2 rounded-sm border text-xs transition ${isCustom ? 'bg-gold text-midnight border-gold font-semibold' : 'gold-border hover:bg-gold/10'}`}>
+            <div className="font-display text-sm">Custom</div>
+            <div className="text-[10px]">Set your own target</div>
+          </button>
+        </div>
+        {isCustom && (
+          <div className="flex items-center gap-2 mt-2">
+            <label className="text-xs text-gold-dim">Target:</label>
+            <input type="number" min={1} max={999} value={customTarget}
+              onChange={e => setCustomTarget(Math.max(1, parseInt(e.target.value) || 1))}
+              className="w-20 px-2 py-1 bg-transparent border gold-border rounded-sm text-center text-sm focus:outline-none focus:border-gold" />
+          </div>
+        )}
+      </div>
+
+      {/* Current dhikr display */}
+      <div className="text-center mb-6">
+        {dhikr.arabic && <div className="font-arabic text-3xl gold-text mb-1">{dhikr.arabic}</div>}
+        <div className="font-display text-lg">{dhikr.translit}</div>
+        <div className="text-xs text-gold-dim italic">{dhikr.meaning}</div>
+      </div>
+
+      {/* Progress ring + tap button */}
+      <div className="flex justify-center mb-4">
+        <div className="relative" style={{ width: 160, height: 160 }}>
+          {/* SVG progress ring */}
+          <svg width="160" height="160" className="absolute inset-0" style={{ transform: 'rotate(-90deg)' }}>
+            <circle cx="80" cy="80" r={R} fill="none" stroke="rgba(212,175,55,0.15)" strokeWidth="8" />
+            <circle cx="80" cy="80" r={R} fill="none" stroke="#d4af37"
+              strokeWidth="8" strokeLinecap="round"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              style={{ transition: 'stroke-dashoffset 0.3s ease' }} />
+          </svg>
+          {/* Tap button */}
+          <button onClick={tap}
+            className={`absolute inset-3 rounded-full flex flex-col items-center justify-center transition-transform active:scale-95 ${pulse ? 'scale-95' : 'scale-100'} ${justCompleted ? 'bg-gold' : 'bg-gold/10 hover:bg-gold/20'}`}
+            style={{ border: `2px solid ${isComplete ? '#d4af37' : 'rgba(212,175,55,0.3)'}` }}>
+            <div className={`font-display text-4xl tabular-nums ${justCompleted ? 'text-midnight' : 'gold-text'}`}>
+              {currentCount}
+            </div>
+            {justCompleted && <div className="text-midnight text-[10px] font-semibold uppercase tracking-wider">Complete!</div>}
+          </button>
+        </div>
+      </div>
+
+      {/* Progress text */}
+      <div className="text-center mb-6">
+        <div className="text-sm text-gold-dim">{currentCount} of {target}</div>
+        {isComplete && !justCompleted && (
+          <div className="text-xs gold-text mt-1">Target reached · Tap to continue</div>
+        )}
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        <div className="p-3 rounded-sm border gold-border text-center">
+          <div className="text-xs uppercase tracking-widest gold-text mb-1">Today Total</div>
+          <div className="font-display text-2xl">{todayTotal}</div>
+        </div>
+        <div className="p-3 rounded-sm border gold-border text-center">
+          <div className="text-xs uppercase tracking-widest gold-text mb-1">Lifetime</div>
+          <div className="font-display text-2xl">{lifetimeTotal}</div>
+        </div>
+      </div>
+
+      <button onClick={resetConfirm}
+        className="w-full py-2 rounded-sm border border-rose-500/40 bg-rose-900/20 text-rose-300 hover:bg-rose-900/40 transition text-sm">
+        Reset Current Count
+      </button>
     </Modal>
   );
 }
