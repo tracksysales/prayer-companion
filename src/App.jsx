@@ -196,6 +196,49 @@ const CALC_METHODS = [
   { id: 13, name: 'Diyanet İşleri Başkanlığı (Turkey)' },
 ];
 
+const FORTY_HADITH = [
+  { number: 1, arabic: 'إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ', english: 'Actions are judged by intentions, and every person will have what they intended. So whoever emigrated for Allah and His Messenger, his emigration was for Allah and His Messenger. And whoever emigrated for worldly gain or to marry a woman, then his emigration was for that which he emigrated.', source: 'Bukhari & Muslim' },
+  { number: 2, arabic: 'الإِسْلَامُ أَنْ تَشْهَدَ أَنْ لَا إِلَهَ إِلَّا اللهُ', english: 'Islam is to testify that there is no deity except Allah and that Muhammad is the Messenger of Allah, to establish prayer, to pay zakat, to fast in Ramadan, and to make pilgrimage to the House if you are able to do so.', source: 'Muslim' },
+  { number: 3, arabic: 'بُنِيَ الإِسْلَامُ عَلَى خَمْسٍ', english: 'Islam is built upon five pillars: testifying that there is no deity except Allah and that Muhammad is the Messenger of Allah, establishing prayer, paying zakat, making pilgrimage to the House, and fasting in Ramadan.', source: 'Bukhari & Muslim' },
+  { number: 4, arabic: 'لَا يَزْنِي الزَّانِي حِينَ يَزْنِي وَهُوَ مُؤْمِنٌ', english: 'One of you does not truly believe until he loves for his brother what he loves for himself.', source: 'Bukhari & Muslim' },
+  { number: 5, arabic: 'مَنْ أَحْدَثَ فِي أَمْرِنَا هَذَا مَا لَيْسَ مِنْهُ فَهُوَ رَدٌّ', english: 'Whoever introduces into this affair of ours something that does not belong to it, it is rejected.', source: 'Bukhari & Muslim' },
+  { number: 6, arabic: 'الْحَلَالُ بَيِّنٌ وَالْحَرَامُ بَيِّنٌ', english: 'The lawful is clear and the unlawful is clear, and between them are doubtful matters about which many people do not know. Whoever guards against doubtful things keeps his religion and his honor blameless.', source: 'Bukhari & Muslim' },
+  { number: 7, arabic: 'الدِّينُ النَّصِيحَةُ', english: 'The religion is sincere good counsel. We said: For whom? He said: For Allah, His Book, His Messenger, the leaders of the Muslims, and their common people.', source: 'Muslim' },
+  { number: 8, arabic: 'أُمِرْتُ أَنْ أُقَاتِلَ النَّاسَ', english: 'I have been commanded to fight people until they testify that there is no deity except Allah and that Muhammad is the Messenger of Allah, establish prayer, and pay zakat. If they do this, their blood and wealth are protected except by the right of Islam, and their final reckoning is with Allah.', source: 'Bukhari & Muslim' },
+  { number: 9, arabic: 'مَا نَهَيْتُكُمْ عَنْهُ فَاجْتَنِبُوهُ', english: 'Whatever I have forbidden for you, avoid it. Whatever I have commanded you, do as much of it as you can. Indeed, what destroyed those before you was excessive questioning and their disagreeing with their prophets.', source: 'Bukhari & Muslim' },
+  { number: 10, arabic: 'إِنَّ اللَّهَ طَيِّبٌ لَا يَقْبَلُ إِلَّا طَيِّبًا', english: 'Allah is pure and only accepts what is pure. Allah has commanded the believers what He commanded the messengers: "O messengers, eat of the good things and do righteous deeds" (23:51). Then he mentioned a man who has traveled far, is disheveled and dusty, and raises his hands to the sky saying, "O Lord! O Lord!" while his food is unlawful, his drink is unlawful, his clothing is unlawful, and he is nourished by what is unlawful. How can his supplication be accepted?', source: 'Muslim' },
+  { number: 11, arabic: 'دَعْ مَا يَرِيبُكَ إِلَى مَا لَا يَرِيبُكَ', english: 'Leave that which makes you doubt for that which does not make you doubt.', source: 'Tirmidhi & Nasai' },
+  { number: 12, arabic: 'مِنْ حُسْنِ إِسْلَامِ الْمَرْءِ تَرْكُهُ مَا لَا يَعْنِيهِ', english: 'Part of the perfection of a person\'s Islam is leaving what does not concern him.', source: 'Tirmidhi' },
+  { number: 13, arabic: 'لَا يُؤْمِنُ أَحَدُكُمْ حَتَّى يُحِبَّ لِأَخِيهِ مَا يُحِبُّ لِنَفْسِهِ', english: 'None of you truly believes until he loves for his brother what he loves for himself.', source: 'Bukhari & Muslim' },
+  { number: 14, arabic: 'لَا يَحِلُّ دَمُ امْرِئٍ مُسْلِمٍ', english: 'The blood of a Muslim may not be spilled except in three cases: the married adulterer, a life for a life, and the one who leaves his religion and abandons the community.', source: 'Bukhari & Muslim' },
+  { number: 15, arabic: 'مَنْ كَانَ يُؤْمِنُ بِاللَّهِ وَالْيَوْمِ الْآخِرِ فَلْيَقُلْ خَيْرًا أَوْ لِيَصْمُتْ', english: 'Whoever believes in Allah and the Last Day, let him speak good or remain silent. Whoever believes in Allah and the Last Day, let him honor his neighbor. Whoever believes in Allah and the Last Day, let him honor his guest.', source: 'Bukhari & Muslim' },
+  { number: 16, arabic: 'لَا تَغْضَبْ وَلَكَ الْجَنَّةُ', english: 'Do not become angry — and Paradise is yours.', source: 'Tabarani (authenticated)' },
+  { number: 17, arabic: 'إِنَّ اللَّهَ كَتَبَ الْإِحْسَانَ عَلَى كُلِّ شَيْءٍ', english: 'Verily Allah has prescribed excellence in all things. So when you kill, do so in a good manner; when you slaughter, do so in a good manner. Let each of you sharpen his blade, and spare suffering to the animal he slaughters.', source: 'Muslim' },
+  { number: 18, arabic: 'اتَّقِ اللَّهَ حَيْثُمَا كُنْتَ', english: 'Fear Allah wherever you may be, follow up a bad deed with a good deed which will wipe it out, and behave well towards people.', source: 'Tirmidhi' },
+  { number: 19, arabic: 'إِذَا أَحْسَنَ أَحَدُكُمْ إِسْلَامَهُ فَكُلُّ حَسَنَةٍ يَعْمَلُهَا تُكْتَبُ لَهُ', english: 'If someone improves his Islam, every good deed he does will be credited to him tenfold to seven hundredfold, and every bad deed will be recorded as it is.', source: 'Bukhari & Muslim' },
+  { number: 20, arabic: 'إِنَّ مِنْ أَفْضَلِ أَيَّامِكُمْ يَوْمُ الْجُمُعَةِ', english: 'Be mindful of Allah and you will find Him in front of you. Know Allah in times of ease and He will know you in times of hardship. Know that what has passed you by was never meant to befall you, and what has befallen you was never meant to pass you by.', source: 'Tirmidhi' },
+  { number: 21, arabic: 'قُلْ آمَنْتُ بِاللَّهِ ثُمَّ اسْتَقِمْ', english: 'Say: I believe in Allah, then remain steadfast.', source: 'Muslim' },
+  { number: 22, arabic: 'لَا يُؤْمِنُ أَحَدُكُمْ حَتَّى يَكُونَ هَوَاهُ تَبَعًا لِمَا جِئْتُ بِهِ', english: 'None of you truly believes until his desires submit to what I have brought.', source: "Ibn Abi 'Asim" },
+  { number: 23, arabic: 'الطَّهُورُ شَطْرُ الْإِيمَانِ', english: 'Purity is half of faith. Alhamdulillah fills the scales. SubhanAllah and Alhamdulillah fill up what is between the heavens and the earth. Prayer is a light, charity is evidence, patience is illumination, and the Quran is proof for you or against you.', source: 'Muslim' },
+  { number: 24, arabic: 'يَا عِبَادِي إِنِّي حَرَّمْتُ الظُّلْمَ عَلَى نَفْسِي', english: 'O My servants, I have forbidden oppression for Myself and have made it forbidden amongst you, so do not oppress one another. O My servants, all of you are astray except for those I have guided, so seek guidance of Me and I shall guide you.', source: 'Muslim' },
+  { number: 25, arabic: 'الصَّدَقَةُ تُطْفِئُ الْخَطِيئَةَ كَمَا يُطْفِئُ الْمَاءُ النَّارَ', english: 'Charity extinguishes sin as water extinguishes fire.', source: 'Tirmidhi' },
+  { number: 26, arabic: 'كُلُّ سُلَامَى مِنَ النَّاسِ عَلَيْهِ صَدَقَةٌ كُلَّ يَوْمٍ', english: 'Charity is due upon every joint of a person on every day that the sun rises. Doing justice between two people is charity. Helping a man with his animal, lifting his luggage or hoisting him up is charity. A good word is charity. Every step taken toward prayer is charity. Removing a harmful thing from the road is charity.', source: 'Bukhari & Muslim' },
+  { number: 27, arabic: 'الْبِرُّ حُسْنُ الْخُلُقِ', english: 'Righteousness is good character, and sin is what wavers in your soul and you dislike people finding out about it.', source: 'Muslim' },
+  { number: 28, arabic: 'عَلَيْكَ بِالصِّدْقِ فَإِنَّ الصِّدْقَ يَهْدِي إِلَى الْبِرِّ', english: 'Adhere to truthfulness, for truthfulness leads to righteousness and righteousness leads to Paradise. A person continues to be truthful and seeks to be truthful until he is recorded with Allah as a siddiq (truthful person). Beware of lying, for lying leads to wickedness and wickedness leads to the Fire.', source: 'Bukhari & Muslim' },
+  { number: 29, arabic: 'مَنْ عَمِلَ مِنْكُمْ لَنَا عَمَلًا فَكَتَمَ مِنْهُ مِخْيَطًا فَمَا فَوْقَهُ فَهُوَ غُلُولٌ', english: 'Whoever practices patience, Allah will make him patient. Nobody can be given a blessing better and greater than patience.', source: 'Bukhari & Muslim' },
+  { number: 30, arabic: 'إِنَّ اللَّهَ فَرَضَ فَرَائِضَ فَلَا تُضَيِّعُوهَا', english: 'Allah has set limits, so do not transgress them. He has prescribed obligations, so do not neglect them. He has forbidden things, so do not violate them. He has left some things unmentioned as mercy for you, not due to forgetfulness, so do not seek after them.', source: 'Daraqutni (authenticated)' },
+  { number: 31, arabic: 'كُنْ فِي الدُّنْيَا كَأَنَّكَ غَرِيبٌ أَوْ عَابِرُ سَبِيلٍ', english: 'Be in this world as though you are a stranger or a wayfarer.', source: 'Bukhari' },
+  { number: 32, arabic: 'لَا ضَرَرَ وَلَا ضِرَارَ', english: 'There should be neither harming nor reciprocating harm.', source: 'Ibn Majah & Daraqutni' },
+  { number: 33, arabic: 'الْبَيِّنَةُ عَلَى مَنِ ادَّعَى وَالْيَمِينُ عَلَى مَنْ أَنْكَرَ', english: 'If people were given everything they claimed, men would claim the wealth and lives of others. The claimant must provide evidence, and the one who denies must swear an oath.', source: 'Bukhari & Muslim (reported)' },
+  { number: 34, arabic: 'مَنْ رَأَى مِنْكُمْ مُنْكَرًا فَلْيُغَيِّرْهُ بِيَدِهِ', english: 'Whoever of you sees an evil, let him change it with his hand; and if he is not able, then with his tongue; and if he is not able, then with his heart — and that is the weakest of faith.', source: 'Muslim' },
+  { number: 35, arabic: 'لَا تَحَاسَدُوا وَلَا تَنَاجَشُوا وَلَا تَبَاغَضُوا', english: 'Do not envy one another, do not artificially inflate prices against one another, do not hate one another, do not turn your backs on one another. Be, O servants of Allah, brothers. A Muslim is the brother of a Muslim — he does not oppress him, he does not fail him, he does not lie to him, and he does not despise him.', source: 'Muslim' },
+  { number: 36, arabic: 'مَنْ نَفَّسَ عَنْ مُؤْمِنٍ كُرْبَةً مِنْ كُرَبِ الدُّنْيَا', english: 'Whoever relieves a believer of a distress from the distresses of this world, Allah will relieve him of a distress from the distresses of the Day of Judgment. Whoever facilitates for one who is in difficulty, Allah will facilitate for him in this world and the Hereafter.', source: 'Muslim' },
+  { number: 37, arabic: 'إِنَّ اللَّهَ كَتَبَ الْحَسَنَاتِ وَالسَّيِّئَاتِ', english: 'Allah has recorded good and bad deeds. Whoever intends a good deed and does not do it, Allah records it as a complete good deed. If he intends it and does it, Allah records it as ten good deeds up to seven hundred or more. If he intends a bad deed and does not do it, Allah records it as a complete good deed.', source: 'Bukhari & Muslim' },
+  { number: 38, arabic: 'مَنْ عَادَى لِي وَلِيًّا فَقَدْ آذَنْتُهُ بِالْحَرْبِ', english: 'Allah said: Whoever takes a friend of Mine as an enemy, I declare war on him. My servant draws near to Me by nothing more beloved to Me than what I have prescribed for him. My servant continues to draw near to Me with voluntary acts until I love him.', source: 'Bukhari (Hadith Qudsi)' },
+  { number: 39, arabic: 'إِنَّ اللَّهَ تَجَاوَزَ عَنْ أُمَّتِي الْخَطَأَ وَالنِّسْيَانَ', english: 'Allah has forgiven my ummah for their mistakes, forgetfulness, and what they are forced to do.', source: 'Ibn Majah (authenticated)' },
+  { number: 40, arabic: 'كُنْ فِي الدُّنْيَا كَأَنَّكَ غَرِيبٌ أَوْ عَابِرُ سَبِيلٍ', english: 'Take advantage of five before five: your youth before your old age, your health before your sickness, your wealth before your poverty, your free time before your occupation, and your life before your death.', source: 'Hakim (authenticated)' },
+];
+
 /* ============================================================
    HELPERS — localStorage with safe fallback
    ============================================================ */
@@ -780,6 +823,9 @@ export default function App() {
 
             <div className="ornament mb-10"></div>
 
+            {/* Today's Reflection */}
+            <TodaysReflection />
+
             {/* Action cards */}
             <div className="grid md:grid-cols-3 gap-4 mb-4">
               <button onClick={() => setOpenGuided(true)}
@@ -1205,6 +1251,114 @@ const DHIKR_PRESETS = [
 function getTodayKey() {
   const d = new Date();
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+/* ============================================================
+   TODAY'S REFLECTION — Daily Verse + Hadith
+   ============================================================ */
+
+function TodaysReflection() {
+  const todayKey = new Date().toISOString().split('T')[0];
+  const [verse, setVerse] = useLocalStorage('pc_daily_verse', null);
+  const [verseDateKey, setVerseDateKey] = useLocalStorage('pc_verse_date', '');
+  const [verseLoading, setVerseLoading] = useState(false);
+  const [audioPlaying, setAudioPlaying] = useState(false);
+  const audioRef = useRef(null);
+
+  // Select today's hadith by day-of-year
+  const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
+  const hadith = FORTY_HADITH[(dayOfYear - 1) % FORTY_HADITH.length];
+
+  useEffect(() => {
+    if (verseDateKey !== todayKey || !verse) {
+      fetchVerse();
+    }
+  }, []); // eslint-disable-line
+
+  async function fetchVerse() {
+    setVerseLoading(true);
+    try {
+      const res = await fetch('https://api.quran.com/api/v4/verses/random?language=en&words=true&translations=131&fields=text_uthmani,chapter_id,verse_number');
+      const data = await res.json();
+      const v = data.verse;
+      if (!v) throw new Error('No verse');
+      const chapterId = v.chapter_id;
+      const verseNum = v.verse_number;
+      const arabic = v.text_uthmani;
+      const english = v.translations?.[0]?.text?.replace(/<[^>]+>/g, '') || '';
+      // Build audio URL from everyayah.com
+      const chStr = String(chapterId).padStart(3, '0');
+      const vStr = String(verseNum).padStart(3, '0');
+      const audioUrl = `https://everyayah.com/data/Alafasy_128kbps/${chStr}${vStr}.mp3`;
+      const surahNames = ['Al-Fatihah','Al-Baqarah','Ali \'Imran','An-Nisa','Al-Maidah','Al-An\'am','Al-A\'raf','Al-Anfal','At-Tawbah','Yunus','Hud','Yusuf','Ar-Ra\'d','Ibrahim','Al-Hijr','An-Nahl','Al-Isra','Al-Kahf','Maryam','Ta-Ha','Al-Anbiya','Al-Hajj','Al-Mu\'minun','An-Nur','Al-Furqan','Ash-Shu\'ara','An-Naml','Al-Qasas','Al-\'Ankabut','Ar-Rum','Luqman','As-Sajdah','Al-Ahzab','Saba','Fatir','Ya-Sin','As-Saffat','Sad','Az-Zumar','Ghafir','Fussilat','Ash-Shura','Az-Zukhruf','Ad-Dukhan','Al-Jathiyah','Al-Ahqaf','Muhammad','Al-Fath','Al-Hujurat','Qaf','Adh-Dhariyat','At-Tur','An-Najm','Al-Qamar','Ar-Rahman','Al-Waqiah','Al-Hadid','Al-Mujadila','Al-Hashr','Al-Mumtahanah','As-Saf','Al-Jumu\'ah','Al-Munafiqun','At-Taghabun','At-Talaq','At-Tahrim','Al-Mulk','Al-Qalam','Al-Haqqah','Al-Ma\'arij','Nuh','Al-Jinn','Al-Muzzammil','Al-Muddaththir','Al-Qiyamah','Al-Insan','Al-Mursalat','An-Naba','An-Nazi\'at','Abasa','At-Takwir','Al-Infitar','Al-Mutaffifin','Al-Inshiqaq','Al-Buruj','At-Tariq','Al-A\'la','Al-Ghashiyah','Al-Fajr','Al-Balad','Ash-Shams','Al-Layl','Ad-Duha','Ash-Sharh','At-Tin','Al-\'Alaq','Al-Qadr','Al-Bayyinah','Az-Zalzalah','Al-\'Adiyat','Al-Qari\'ah','At-Takathur','Al-\'Asr','Al-Humazah','Al-Fil','Quraysh','Al-Ma\'un','Al-Kawthar','Al-Kafirun','An-Nasr','Al-Masad','Al-Ikhlas','Al-Falaq','An-Nas'];
+      const surahName = surahNames[chapterId - 1] || `Surah ${chapterId}`;
+      const newVerse = { arabic, english, citation: `${surahName} ${chapterId}:${verseNum}`, audioUrl };
+      setVerse(newVerse);
+      setVerseDateKey(todayKey);
+    } catch {
+      // silently fail — keep old verse if cached
+    } finally {
+      setVerseLoading(false);
+    }
+  }
+
+  function toggleAudio() {
+    if (!audioRef.current || !verse?.audioUrl) return;
+    if (audioPlaying) {
+      audioRef.current.pause();
+      setAudioPlaying(false);
+    } else {
+      audioRef.current.src = verse.audioUrl;
+      audioRef.current.play().then(() => setAudioPlaying(true)).catch(() => setAudioPlaying(false));
+    }
+  }
+
+  return (
+    <div className="mb-10 fade-in">
+      <h2 className="font-display text-3xl mb-2 gold-text">Today's Reflection</h2>
+      <p className="text-sm text-gold-dim mb-6 italic">A verse and hadith to carry through the day.</p>
+      <audio ref={audioRef} onEnded={() => setAudioPlaying(false)} preload="none" />
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* Daily Verse */}
+        <div className="p-6 rounded-sm border gold-border" style={{ background: 'rgba(212,175,55,0.04)' }}>
+          <div className="text-xs uppercase tracking-widest gold-text mb-3">Daily Verse</div>
+          {verseLoading && <div className="text-sm text-gold-dim">Loading verse...</div>}
+          {verse && !verseLoading && (
+            <>
+              <div className="font-arabic text-xl gold-text mb-3 leading-loose">{verse.arabic}</div>
+              <div className="text-sm leading-relaxed mb-3">{verse.english}</div>
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-gold-dim">— {verse.citation}</div>
+                {verse.audioUrl && (
+                  <button onClick={toggleAudio}
+                    className="flex items-center gap-1 text-xs px-3 py-1 rounded-sm border gold-border hover:bg-gold/10 transition gold-text">
+                    {audioPlaying ? '⏸ Pause' : '▶ Listen'}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+          {!verse && !verseLoading && (
+            <button onClick={fetchVerse} className="text-sm gold-text hover:underline">Load today's verse</button>
+          )}
+        </div>
+
+        {/* Daily Hadith */}
+        <div className="p-6 rounded-sm border gold-border" style={{ background: 'rgba(212,175,55,0.04)' }}>
+          <div className="text-xs uppercase tracking-widest gold-text mb-3">Hadith #{hadith.number}</div>
+          <div className="font-arabic text-lg gold-text mb-3 leading-loose">{hadith.arabic}</div>
+          <div className="text-sm leading-relaxed mb-3">{hadith.english}</div>
+          <div className="text-xs text-gold-dim">— An-Nawawi's Forty Hadith · {hadith.source}</div>
+          {hasSpeechSynthesis && (
+            <button onClick={() => speakArabic(hadith.arabic)}
+              className="mt-3 flex items-center gap-1 text-xs px-3 py-1 rounded-sm border gold-border hover:bg-gold/10 transition gold-text">
+              🔊 Hear Arabic
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function TasbihCounter({ onClose, times }) {
