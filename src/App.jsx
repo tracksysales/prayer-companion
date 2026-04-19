@@ -326,11 +326,14 @@ function speakArabic(text, rate = 0.85) {
   u.lang = 'ar-SA';
   u.rate = rate;
   u.pitch = 1.0;
-  // Chrome has a race condition where cancel() followed immediately by speak()
-  // causes the utterance to be silently dropped. We cancel first, then defer
-  // the speak() call to the next event-loop tick to let cancel complete.
+  // Chrome bugs: (1) cancel()→speak() in same tick silently drops the utterance;
+  // (2) speechSynthesis gets stuck in a paused state and ignores speak() calls.
+  // Fix: cancel, then after 100ms call resume() to unstick + speak().
   window.speechSynthesis.cancel();
-  setTimeout(() => window.speechSynthesis.speak(u), 50);
+  setTimeout(() => {
+    window.speechSynthesis.resume();
+    window.speechSynthesis.speak(u);
+  }, 100);
   return u;
 }
 
@@ -3130,7 +3133,7 @@ function TtsButton({ text, rate = 0.85 }) {
       if (!hasSpeechSynthesis) return;
       const u = speakArabic(text, rate);
       if (u) {
-        setSpeaking(true);
+        u.onstart = () => setSpeaking(true);
         u.onend = () => setSpeaking(false);
         u.onerror = () => setSpeaking(false);
       }
@@ -3613,12 +3616,15 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
 
     // Speak TTS dua for silent phases
     if (s.ttsDua && hasSpeechSynthesis) {
-      stopSpeaking();
       const u = new SpeechSynthesisUtterance(s.ttsDua);
       u.lang = 'ar-SA';
       u.rate = spd * 0.85;
       u.pitch = 1.0;
-      window.speechSynthesis.speak(u);
+      window.speechSynthesis.cancel();
+      setTimeout(() => {
+        window.speechSynthesis.resume();
+        window.speechSynthesis.speak(u);
+      }, 100);
     }
 
     if (s.audio && audioRef.current) {
