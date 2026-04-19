@@ -1,5 +1,5 @@
 /**
- * Google Cloud TTS — Chirp3-HD Algenib male voice
+ * Google Cloud TTS — Chirp3-HD Puck voice
  * Used for high-quality English narration of Prophets' Stories.
  *
  * Requires env var: GOOGLE_TTS_API_KEY
@@ -13,7 +13,7 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: 'TTS_KEY_MISSING' });
   }
 
-  const { text, languageCode = 'en-US', voiceName = 'en-US-Chirp3-HD-Algenib' } = req.body || {};
+  const { text, languageCode = 'en-US', voiceName = 'en-US-Chirp3-HD-Puck' } = req.body || {};
   if (!text || typeof text !== 'string') {
     return res.status(400).json({ error: 'text required' });
   }

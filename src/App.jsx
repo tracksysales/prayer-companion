@@ -2391,7 +2391,7 @@ function StoryDetailModal({ story, onClose }) {
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, languageCode: 'en-US', voiceName: 'en-US-Chirp3-HD-Algenib' }),
+        body: JSON.stringify({ text, languageCode: 'en-US', voiceName: 'en-US-Chirp3-HD-Puck' }),
       });
       if (!res.ok) throw new Error('tts_api_failed');
       const blob = await res.blob();
