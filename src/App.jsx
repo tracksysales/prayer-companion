@@ -316,6 +316,15 @@ function stopSpeaking() {
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 }
 
+function speakEnglish(text) {
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'en-US';
+  u.rate = 0.95;
+  window.speechSynthesis.speak(u);
+}
+
 const hasSpeechSynthesis = typeof window !== 'undefined' && 'speechSynthesis' in window;
 
 /* ============================================================
@@ -489,6 +498,8 @@ export default function App() {
   const [openAdhkar, setOpenAdhkar] = useState(null); // 'morning' | 'evening' | null
   const [openDuaLibrary, setOpenDuaLibrary] = useState(false);
   const [openMosques, setOpenMosques] = useState(false);
+  const [openStories, setOpenStories] = useState(false);
+  const [openStory, setOpenStory] = useState(null);
   const [guidedRakats, setGuidedRakats] = useState(2);
 
   const adhanAudioRef = useRef(null);
@@ -893,6 +904,18 @@ export default function App() {
               </div>
             </div>
 
+            <div className="mb-10">
+              <h2 className="font-display text-2xl mb-4 gold-text tracking-wide">Learn</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <button onClick={() => setOpenStories(true)}
+                  className="p-5 rounded-sm border gold-border text-left hover:bg-gold/5 transition">
+                  <div className="text-2xl mb-2">📖</div>
+                  <div className="font-display text-lg mb-1">Prophets' Stories</div>
+                  <div className="text-xs text-gold-dim">Stories from the Quran</div>
+                </button>
+              </div>
+            </div>
+
             {/* Mood section */}
             <div className="mb-10">
               <h2 className="font-display text-3xl mb-2 gold-text">A Dua for Every Moment</h2>
@@ -1029,6 +1052,13 @@ export default function App() {
 
         {openMosques && (
           <NearbyMosquesModal location={location} onClose={() => setOpenMosques(false)} />
+        )}
+
+        {openStories && (
+          <ProphetsStoriesModal onClose={() => setOpenStories(false)} onSelectStory={setOpenStory} />
+        )}
+        {openStory && (
+          <StoryDetailModal story={openStory} onClose={() => setOpenStory(null)} />
         )}
 
         {/* Settings modal */}
@@ -1478,6 +1508,275 @@ const DUA_LIBRARY = [
   { id: 's6', cat: 'Special Occasions', situation: 'During Ramadan', arabic: 'رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ', translit: "Rabbana atina fid-dunya hasanatan wa fil-akhirati hasanatan wa qina 'adhaban-nar", translation: 'Our Lord, give us good in this world and good in the Hereafter, and protect us from the punishment of the Fire.', source: 'Quran 2:201', context: 'Anas (RA) said the Prophet recited this dua more than any other supplication.' },
   { id: 's7', cat: 'Special Occasions', situation: 'Upon hearing adhan', arabic: 'أَشْهَدُ أَنْ لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، وَأَنَّ مُحَمَّدًا عَبْدُهُ وَرَسُولُهُ', translit: "Ashhadu an la ilaha illallah wahdahu la sharika lah, wa anna Muhammadan 'abduhu wa rasuluh", translation: 'I testify that there is no deity except Allah, alone without partner, and that Muhammad is His servant and Messenger.', source: 'Hisn al-Muslim #17 — Muslim 386', context: "Repeat each phrase of the adhan after the muadhin, except during hayya 'alas-salah say: La hawla wa la quwwata illa billah." },
 ];
+
+/* ============================================================
+   PROPHETS' STORIES — From Quranic accounts, child-friendly
+   ============================================================ */
+
+const PROPHETS = [
+  {
+    id: 'adam',
+    nameArabic: 'آدَم',
+    nameEnglish: 'Adam (AS)',
+    icon: '🌿',
+    readTime: '3 min',
+    quranRefs: ['2:30-39', '7:11-25', '20:115-123'],
+    story: `Allah, the Most Wise, decided to create a special being — Adam, the first human. Before creating him, Allah announced to the angels: "I am going to place a vicegerent on Earth." The angels were curious, wondering if this new creation might cause trouble. But Allah said: "I know what you do not know."
+
+Allah created Adam from clay, shaping him with His own hands, and then breathed into him a soul. At once, Adam (AS) became alive — the first human to ever walk. Allah taught Adam the names of all things, giving him a unique kind of knowledge that even the angels did not have.
+
+Allah commanded the angels to bow in respect to Adam — not as worship (for worship belongs only to Allah), but as an honor to this new creation. All the angels obeyed. But one being — Iblis, who was from the jinn — refused out of pride. He said, "I am better than him! You made me from fire and made him from clay." This pride led to his expulsion from Allah's mercy.
+
+Allah placed Adam and his wife Hawwa (Eve) in a beautiful garden, giving them permission to eat from everything except one specific tree. But Iblis, now their enemy, whispered to them until they tasted the forbidden fruit. Immediately, they realized their mistake and turned to Allah in sincere repentance, saying: "Our Lord! We have wronged ourselves. If You do not forgive us and have mercy on us, we will surely be among the losers" (7:23).
+
+Allah forgave them — for He is Al-Ghaffar, the Most Forgiving. They were then sent to Earth to live out their lives, with the promise that whoever follows Allah's guidance will have no fear and no sadness.`,
+    moral: "Allah is Al-Ghaffar — the Most Forgiving. When we make a mistake, we turn to Him with sincere repentance, just as Adam and Hawwa did. Pride (like Iblis showed) is one of the most dangerous qualities; it leads away from Allah's mercy.",
+  },
+  {
+    id: 'nuh',
+    nameArabic: 'نُوح',
+    nameEnglish: 'Nuh / Noah (AS)',
+    icon: '⛵',
+    readTime: '3 min',
+    quranRefs: ['7:59-64', '11:25-49', '71:1-28'],
+    story: `Nuh (AS) was a prophet who lived among a people who had turned away from worshipping Allah alone and had started to worship statues and idols. For 950 years — an incredibly long time — Nuh called his people to the truth, day and night, privately and publicly.
+
+But most of his people refused. They mocked him, covered their ears, and told their children not to listen to him. Only a small group of believers followed Nuh (AS).
+
+Then Allah revealed to Nuh that no more of his people would believe. He commanded Nuh to build a great ship — an ark — even though there was no sea nearby. The people laughed when they saw him building it. But Nuh continued, following Allah's command faithfully.
+
+When the ark was finished, Allah commanded Nuh to board it with the believers and a pair from every kind of animal. Then the rains began, and water gushed up from the earth too, flooding the whole land. Even Nuh's own son refused to board — thinking he could climb a mountain to be safe. But no mountain could save him from Allah's decree.
+
+After the flood, the waters receded, and the ark came to rest on Mount Judi. Nuh (AS) stepped out in peace. He was grateful to Allah, and Allah honored him with the greeting of peace for all generations: "Peace be upon Nuh among all the worlds" (37:79).`,
+    moral: "Patience and perseverance in calling to truth, no matter the obstacles. Nuh (AS) never gave up for 950 years. Family ties do not override the truth — belief is a choice each person must make for themselves.",
+  },
+  {
+    id: 'ibrahim',
+    nameArabic: 'إِبْرَاهِيم',
+    nameEnglish: 'Ibrahim / Abraham (AS)',
+    icon: '🔥',
+    readTime: '4 min',
+    quranRefs: ['2:124-132', '6:74-83', '21:51-70', '37:83-111'],
+    story: `Ibrahim (AS) grew up in a land where everyone worshipped idols — statues carved from stone and wood. Even his own father, Azar, made these idols. But Ibrahim (AS), from a young age, used his reason and asked the deep question: how can a statue that cannot see, hear, or move be God?
+
+He looked at the stars, the moon, and the sun. Each one set and disappeared. He said: "I do not love things that set" (6:76). Through sincere reflection, he arrived at the truth: only Allah, the Creator of everything, deserves worship.
+
+Ibrahim (AS) tried to guide his people with wisdom, even smashing their idols to show that they were powerless. When the king had him thrown into a blazing fire as punishment, Allah commanded the fire: "Be cool and safe for Ibrahim" (21:69). And it obeyed — the fire did not harm him at all.
+
+Ibrahim (AS) was later given two sons: Ismail (AS) through Hajar, and Ishaq (AS) through Sarah. Allah tested him with the hardest test of all — a dream commanding him to sacrifice his beloved son Ismail. Both father and son submitted to Allah's command with full trust. But just as Ibrahim raised his hand, Allah stopped him and revealed that it was only a test. He provided a ram to sacrifice instead.
+
+For his complete submission, Allah gave Ibrahim (AS) the greatest titles: Khalilullah (the Friend of Allah), and the father of monotheism — the one who laid the foundations of the Kaaba in Makkah, which Muslims face in prayer to this day.`,
+    moral: "True faith means using reason to find the truth and then submitting fully to Allah even when it is difficult. Ibrahim (AS) showed that trust in Allah — tawakkul — brings protection and honor.",
+  },
+  {
+    id: 'yusuf',
+    nameArabic: 'يُوسُف',
+    nameEnglish: 'Yusuf / Joseph (AS)',
+    icon: '⭐',
+    readTime: '4 min',
+    quranRefs: ['12:1-111'],
+    story: `Yusuf (AS) was the son of the Prophet Ya'qub (Jacob). As a young boy, he had a dream: eleven stars, the sun, and the moon bowed down to him. His father told him not to share this dream with his jealous older brothers.
+
+But his brothers plotted against him out of envy. They threw him into a well and told their father he had been eaten by a wolf — showing his shirt stained with false blood. A passing caravan found young Yusuf and sold him into slavery in Egypt.
+
+In Egypt, Yusuf (AS) worked in the house of a nobleman. He was handsome and virtuous. When he was tested by the nobleman's wife — who tried to lure him into sin — he refused, saying "I seek refuge in Allah!" He was falsely accused and imprisoned.
+
+Even in prison, Yusuf (AS) remained patient, teaching his fellow prisoners about Allah and interpreting their dreams. When the king of Egypt had a troubling dream that no one could explain, Yusuf (AS) was called to interpret it. He explained that Egypt would have seven years of plenty followed by seven years of famine — and advised them how to prepare. The king was so impressed that he freed Yusuf and made him minister of Egypt.
+
+Years later, his brothers came to Egypt seeking food during the famine, not recognizing the brother they had wronged. Yusuf (AS) revealed himself and, instead of taking revenge, said: "No blame on you today. Allah will forgive you, for He is the most merciful of the merciful" (12:92). His father and the whole family were reunited, and the dream came true — they all bowed in honor before him.`,
+    moral: "Patience through hardship, refusing sin even when tempted, and forgiving those who wronged you. Yusuf's story shows that after every hardship comes ease — and that Allah never abandons those who are righteous.",
+  },
+  {
+    id: 'musa',
+    nameArabic: 'مُوسَى',
+    nameEnglish: 'Musa / Moses (AS)',
+    icon: '🌊',
+    readTime: '4 min',
+    quranRefs: ['2:49-61', '7:103-137', '20:9-98', '26:10-68'],
+    story: `Musa (AS) was born at a dangerous time. The Pharaoh of Egypt had decreed that all newborn Israelite boys be killed, fearing a prophecy that a child from their people would end his rule. Allah inspired Musa's mother to place the baby in a basket and float him on the river.
+
+The basket was found by none other than Pharaoh's own family, and his wife persuaded Pharaoh to keep the child. By Allah's plan, the baby would only nurse from his own mother — so a woman was sought, and his mother was brought in without anyone knowing the connection. Musa (AS) was raised in the very palace of the man who sought to kill him.
+
+Years later, after accidentally causing the death of a man and fleeing to Midian, Musa (AS) was tending sheep when he saw a burning bush on Mount Sinai. Allah spoke to him from the fire: "O Musa, I am Allah, Lord of the worlds!" He was given two miracles — a staff that could turn into a serpent, and a hand that could glow with pure white light — and was commanded to go to Pharaoh and call him to the truth.
+
+Musa (AS) and his brother Harun (AS) went to Pharaoh with the message. Pharaoh refused, so Allah sent signs and plagues upon Egypt. Finally, when Pharaoh's army was chasing the Israelites toward the sea, Musa (AS) struck the water with his staff and the sea split into twelve dry pathways. The Israelites crossed safely. When Pharaoh's army followed, the sea closed over them.
+
+Musa (AS) was given the Torah on Mount Sinai, and he spoke directly with Allah — earning him the title Kalimullah (one who spoke with Allah).`,
+    moral: "Trust in Allah completely, even when the sea is before you and the enemy is behind. Allah's plan is always working, even in moments that seem impossible. Courage and faith together move mountains — and seas.",
+  },
+  {
+    id: 'dawud',
+    nameArabic: 'دَاوُد',
+    nameEnglish: 'Dawud / David (AS)',
+    icon: '🎵',
+    readTime: '2 min',
+    quranRefs: ['2:251', '21:78-80', '27:15', '34:10-11', '38:17-26'],
+    story: `Dawud (AS) was a young man from the Israelites when he faced the great warrior Jalut (Goliath), who had terrorized their people. While experienced soldiers hesitated, Dawud (AS) stepped forward with his sling and a stone — and by Allah's permission, he struck Jalut and brought him down. This unexpected victory changed the course of history.
+
+Allah granted Dawud (AS) prophethood and kingship. He was given a beautiful voice — when he sang the Psalms (Zabur), the mountains and birds would join him in glorifying Allah. The Quran says: "O mountains and birds, echo the praises of Allah with him" (34:10).
+
+Allah also taught Dawud (AS) to make armor from iron, a great blessing that protected people. He was known for his wisdom and justice in ruling.
+
+When Dawud (AS) made an error in a matter of judgment, he turned to Allah immediately with deep repentance, bowing and weeping until Allah forgave him. His son Sulayman (AS) inherited his prophethood.`,
+    moral: "True strength is not in size or weapons, but in faith in Allah. Dawud's story shows that gratitude, justice, and turning back to Allah in repentance are the marks of a great leader.",
+  },
+  {
+    id: 'sulayman',
+    nameArabic: 'سُلَيْمَان',
+    nameEnglish: 'Sulayman / Solomon (AS)',
+    icon: '👑',
+    readTime: '2 min',
+    quranRefs: ['21:81-82', '27:15-44', '34:12-14', '38:30-40'],
+    story: `Sulayman (AS) was given a kingdom unlike any before or after — he could speak to animals and birds, control the wind, and command the jinn to work for him. He used all of this not for pride, but to serve Allah and build great things.
+
+One day, his army was marching when an ant called out to her fellow ants: "Go into your homes, or Sulayman and his soldiers will crush you unintentionally!" Sulayman (AS), who could understand the ant's words, smiled and prayed: "My Lord, inspire me to be grateful for Your favors upon me and upon my parents, and to do righteous deeds that please You" (27:19).
+
+Sulayman (AS) ruled with justice and wisdom. When the Queen of Sheba came to visit, she was moved by the truth and embraced faith in Allah.
+
+Sulayman (AS) is a reminder that power, wealth, and abilities are gifts from Allah — when used with gratitude and in service of truth, they become sources of great blessing.`,
+    moral: "Be grateful for every gift Allah has given you, no matter how small or large. True power is used in the service of justice and truth, not for arrogance.",
+  },
+  {
+    id: 'yunus',
+    nameArabic: 'يُونُس',
+    nameEnglish: 'Yunus / Jonah (AS)',
+    icon: '🐋',
+    readTime: '2 min',
+    quranRefs: ['10:98', '21:87-88', '37:139-148', '68:48-50'],
+    story: `Yunus (AS) was sent as a prophet to the people of Ninevah. After calling them to Allah for a long time without success, he grew frustrated and left without waiting for Allah's permission. He boarded a ship, and when a storm hit, the sailors drew lots to decide who should be thrown overboard to lighten the load. The lot fell on Yunus (AS) three times.
+
+He was thrown into the sea and swallowed by a great whale. In the darkness of the ocean, inside the belly of the whale, Yunus (AS) called out to Allah with complete humility:
+
+"There is no deity except You; exalted are You. Indeed, I have been of the wrongdoers." (21:87)
+
+This prayer — known as Dua al-Yunus or Dua al-Karb — is one of the most powerful supplications in Islam. Allah heard him and commanded the whale to release him on shore.
+
+Yunus (AS) recovered under a plant that Allah caused to grow for his shade and rest. Then Allah sent him back to his people — and this time, 100,000 of them believed. Their whole city was saved.`,
+    moral: "No matter how lost or trapped you feel, turn to Allah with sincerity. The dua of Yunus — \"La ilaha illa anta, subhanaka, inni kuntu minaz-zalimin\" — is said to be answered in every difficulty.",
+  },
+  {
+    id: 'isa',
+    nameArabic: 'عِيسَى',
+    nameEnglish: 'Isa / Jesus (AS)',
+    icon: '✨',
+    readTime: '3 min',
+    quranRefs: ['3:45-55', '4:171-172', '5:110-117', '19:16-40'],
+    story: `Isa (AS) was born through a miracle — his mother Maryam (Mary) was a righteous woman who had dedicated herself to worship in the temple. When the angel Jibreel (Gabriel) appeared and told her she would have a son without a father, she was astonished. Allah said: "Allah creates what He wills. When He decrees a thing, He only says to it 'Be' — and it is" (3:47).
+
+When Maryam returned to her people with the baby, they accused her. But baby Isa (AS), lying in his cradle, spoke: "I am the servant of Allah. He has given me the Scripture and made me a prophet" (19:30). This was his first miracle.
+
+Isa (AS) grew to be a prophet with extraordinary signs: he healed the blind and the leper, gave life to birds from clay by Allah's permission, and even raised the dead — all as signs from Allah, not from himself.
+
+He called his people to worship Allah alone, and taught love, mercy, and justice. His disciples were his supporters. When his enemies plotted to kill him, Allah raised him up to Himself — he was not crucified as many believe. He will return before the Day of Judgment.
+
+The Quran honors Isa (AS) as the Messiah, the Word of Allah, and a great messenger — while affirming that he is a human prophet and servant of Allah, not divine.`,
+    moral: "Isa (AS) taught love, truth, and service to Allah alone. Miracles are signs of Allah's power, not the prophet's own. Every blessing — speech, healing, life — comes only from Allah.",
+  },
+  {
+    id: 'muhammad',
+    nameArabic: 'مُحَمَّد',
+    nameEnglish: 'Muhammad \u{FE0F}',
+    icon: '🌙',
+    readTime: '5 min',
+    quranRefs: ['33:40', '33:21', '68:4', '21:107', '3:144'],
+    story: `Muhammad was born in Makkah around 570 CE, in the tribe of Quraysh. He lost his father before birth and his mother when he was six. He was raised by his grandfather Abd al-Muttalib, then his uncle Abu Talib. From his youth, he was known for his honesty and trustworthiness — the people called him Al-Amin: "The Trustworthy One."
+
+He married the noble businesswoman Khadijah (RA), who was the first to believe in him. At the age of 40, while meditating in the Cave of Hira, the angel Jibreel appeared and revealed the first verses of the Quran: "Read! In the name of your Lord who created..." (96:1). Muhammad trembled with awe. Khadijah comforted him and took him to her cousin Waraqa, who confirmed this was prophethood.
+
+For 13 years in Makkah, the Prophet called people to worship Allah alone. He and his followers were persecuted, boycotted, tortured. Yet he never gave up, and never responded to cruelty with cruelty. His character was the Quran made flesh — Allah said: "You are of a magnificent character" (68:4).
+
+The Muslims migrated to Madinah, where the first Islamic community was built — based on brotherhood, justice, and mutual support between the emigrants and the Ansar (helpers). Within 10 years, Islam had spread across Arabia. The Prophet returned to Makkah in the conquest, forgiving his former enemies with the words of his ancestor Yusuf (AS): "No blame upon you today."
+
+He passed from this world at 63, having delivered the complete message. His last major sermon declared: "I have left you two things — if you hold on to them, you will never go astray: the Book of Allah and the Sunnah of His Prophet."`,
+    moral: "The Prophet is the best example for all of humanity. His life teaches us: be honest, be patient, be forgiving, love people, and hold fast to the Quran and Sunnah. He is Allah's mercy to all the worlds (21:107).",
+  },
+];
+
+function ProphetsStoriesModal({ onClose, onSelectStory }) {
+  return (
+    <Modal onClose={onClose}>
+      <div className="flex items-center gap-3 mb-6">
+        <div className="text-3xl">📖</div>
+        <div>
+          <div className="font-display text-3xl">Stories of the Prophets</div>
+          <div className="text-xs text-gold-dim">From Quranic accounts · Family-friendly</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        {PROPHETS.map(p => (
+          <button key={p.id} onClick={() => { onSelectStory(p); }}
+            className="p-4 rounded-sm border gold-border hover:bg-gold/5 transition text-left">
+            <div className="text-2xl mb-2">{p.icon}</div>
+            <div className="font-arabic text-lg gold-text">{p.nameArabic}</div>
+            <div className="font-display text-sm">{p.nameEnglish}</div>
+            <div className="text-[10px] text-gold-dim mt-1">&#x23F1; {p.readTime}</div>
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-6 text-[10px] text-gold-dim text-center italic">
+        Stories summarized from the Quran for educational purposes. For scholarly study, consult authentic tafsir and verified sources.
+      </div>
+    </Modal>
+  );
+}
+
+function StoryDetailModal({ story, onClose }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  function playStory() {
+    if (!hasSpeechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(story.story + ' Moral: ' + story.moral);
+    u.lang = 'en-US';
+    u.rate = 0.95;
+    u.onstart = () => setIsPlaying(true);
+    u.onend = () => setIsPlaying(false);
+    window.speechSynthesis.speak(u);
+  }
+
+  function stopStory() {
+    window.speechSynthesis.cancel();
+    setIsPlaying(false);
+  }
+
+  return (
+    <Modal onClose={() => { stopStory(); onClose(); }}>
+      <div className="flex items-center gap-3 mb-2">
+        <div className="text-4xl">{story.icon}</div>
+        <div>
+          <div className="font-arabic text-2xl gold-text">{story.nameArabic}</div>
+          <div className="font-display text-3xl">{story.nameEnglish}</div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 mb-6 text-[10px] text-gold-dim">
+        <span>&#x23F1; {story.readTime}</span>
+        <span>·</span>
+        <span>Refs: {story.quranRefs.join(', ')}</span>
+      </div>
+
+      {hasSpeechSynthesis && (
+        <button onClick={isPlaying ? stopStory : playStory}
+          className="flex items-center gap-2 text-xs px-4 py-2 rounded-sm border gold-border hover:bg-gold/10 transition gold-text mb-6">
+          {isPlaying ? '&#9209; Stop Listening' : '&#9654; Listen to Story'}
+        </button>
+      )}
+
+      <div className="text-sm leading-relaxed whitespace-pre-line mb-6">{story.story}</div>
+
+      <div className="p-4 rounded-sm border border-gold/40 bg-gold/5 mb-4">
+        <div className="text-xs uppercase tracking-widest gold-text mb-2">Moral of the Story</div>
+        <div className="text-sm leading-relaxed italic">{story.moral}</div>
+      </div>
+
+      <div className="text-[10px] text-gold-dim">
+        Quranic references: {story.quranRefs.map(r => `Quran ${r}`).join(' · ')}
+      </div>
+    </Modal>
+  );
+}
 
 /* ============================================================
    NEARBY MOSQUES — Overpass API (OpenStreetMap)
