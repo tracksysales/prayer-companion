@@ -320,12 +320,37 @@ function minutesToCountdown(mins) {
    TTS HELPERS — Arabic speech synthesis
    ============================================================ */
 
+// Detect whether the browser has an Arabic voice installed.
+// Chrome on Android ships ar-SA voices; Chrome on Windows/macOS often does NOT.
+// We cache the result after voices load so it's fast on repeated calls.
+let _arabicVoiceCache = null; // null = unchecked, false = none found, Voice = found
+
+function getArabicVoice() {
+  if (_arabicVoiceCache !== null) return _arabicVoiceCache;
+  if (!('speechSynthesis' in window)) return false;
+  const voices = window.speechSynthesis.getVoices();
+  const found = voices.find(v => v.lang.startsWith('ar')) || false;
+  if (voices.length > 0) _arabicVoiceCache = found; // only cache once voices are loaded
+  return found;
+}
+
+// Invalidate cache when voices list changes (async on Chrome)
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  window.speechSynthesis.onvoiceschanged = () => { _arabicVoiceCache = null; };
+}
+
 function speakArabic(text, rate = 0.85) {
   if (!('speechSynthesis' in window)) return null;
+  const voice = getArabicVoice();
+  if (!voice) {
+    // No Arabic TTS voice — silently skip (caller should show fallback UI)
+    return null;
+  }
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'ar-SA';
   u.rate = rate;
   u.pitch = 1.0;
+  u.voice = voice;
   // Chrome bugs: (1) cancel()→speak() in same tick silently drops the utterance;
   // (2) speechSynthesis gets stuck in a paused state and ignores speak() calls.
   // Fix: cancel, then after 100ms call resume() to unstick + speak().
@@ -351,6 +376,27 @@ function speakEnglish(text) {
 }
 
 const hasSpeechSynthesis = typeof window !== 'undefined' && 'speechSynthesis' in window;
+
+// hasArabicTts — true only if an Arabic voice is actually installed.
+// Used to decide whether to show TTS buttons or audio-fallback buttons.
+function useHasArabicTts() {
+  const [has, setHas] = useState(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return false;
+    const voices = window.speechSynthesis.getVoices();
+    return voices.some(v => v.lang.startsWith('ar'));
+  });
+  useEffect(() => {
+    if (!('speechSynthesis' in window)) return;
+    const check = () => {
+      const voices = window.speechSynthesis.getVoices();
+      setHas(voices.some(v => v.lang.startsWith('ar')));
+    };
+    window.speechSynthesis.addEventListener('voiceschanged', check);
+    check();
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', check);
+  }, []);
+  return has;
+}
 
 /* ============================================================
    SVG PRAYER FIGURE COMPONENTS — gold-on-dark posture guides
@@ -3120,6 +3166,7 @@ function TasbihCounter({ onClose, times }) {
 
 function TtsButton({ text, rate = 0.85 }) {
   const [speaking, setSpeaking] = useState(false);
+  const hasArabicVoice = useHasArabicTts();
 
   useEffect(() => {
     return () => stopSpeaking();
@@ -3130,7 +3177,7 @@ function TtsButton({ text, rate = 0.85 }) {
       stopSpeaking();
       setSpeaking(false);
     } else {
-      if (!hasSpeechSynthesis) return;
+      if (!hasSpeechSynthesis || !hasArabicVoice) return;
       const u = speakArabic(text, rate);
       if (u) {
         u.onstart = () => setSpeaking(true);
@@ -3142,11 +3189,21 @@ function TtsButton({ text, rate = 0.85 }) {
 
   if (!hasSpeechSynthesis) {
     return (
-      <button disabled title="Not supported on this device"
-        className="flex items-center gap-2 px-4 py-2 rounded-sm border border-gold/20 text-gold-dim/50 cursor-not-allowed text-sm">
-        <PlayCircle className="w-4 h-4" />
-        Listen (not supported on this device)
-      </button>
+      <div className="flex items-center gap-2 px-4 py-2 rounded-sm border border-gold/15 text-gold-dim/50 text-xs italic">
+        Arabic audio not supported on this browser.
+      </div>
+    );
+  }
+
+  if (!hasArabicVoice) {
+    return (
+      <div className="flex items-start gap-2 px-4 py-2 rounded-sm border border-gold/20 bg-gold/5 text-xs text-gold-dim leading-relaxed">
+        <Volume2 className="w-4 h-4 mt-0.5 shrink-0 gold-text" />
+        <span>
+          Arabic pronunciation requires an Arabic voice pack installed on your device.
+          On Windows: <span className="gold-text">Settings → Time &amp; Language → Language → Arabic → Download</span>. On mobile it works automatically.
+        </span>
+      </div>
     );
   }
 
@@ -3382,6 +3439,28 @@ function MoodDuaModal({ moodKey, onClose }) {
    GUIDED PRAYER — step-by-step with auto-play mode
    ============================================================ */
 
+// Beautifully recited audio for key prayer steps (hosted MP3s, no TTS needed)
+// Sources: al-hamdoulillah.com (Sahih al-Bukhari #831), quranclick.com, everyayah.com
+const STEP_AUDIO = {
+  // At-Tahiyyat (Tashahhud) — 21s — from al-hamdoulillah.com (Sahih al-Bukhari #831)
+  tashahhud: 'https://www.al-hamdoulillah.com/invocations/mp3/52.mp3',
+  // Durood Ibrahim (complete) — beautifully recited
+  durood: 'https://www.quranclick.com/Downloads/Duain/Darood-e-Ibrahimi.mp3',
+  // Surah Ibrahim 14:40 — Mishary Alafasy 128kbps
+  ibrahim40: 'https://everyayah.com/data/Alafasy_128kbps/014040.mp3',
+  // Surah Ibrahim 14:41 — Mishary Alafasy 128kbps
+  ibrahim41: 'https://everyayah.com/data/Alafasy_128kbps/014041.mp3',
+};
+
+// Sequential audio files for the Final Tashahhud + Durood + Dua step.
+// Each section plays one after the other in the step.
+const TASHAHHUD_FINAL_TRACKS = [
+  { label: 'At-Tahiyyat (Tashahhud)', url: STEP_AUDIO.tashahhud },
+  { label: 'Durood Ibrahim', url: STEP_AUDIO.durood },
+  { label: 'Dua — Ibrahim 14:40', url: STEP_AUDIO.ibrahim40 },
+  { label: 'Dua — Ibrahim 14:41', url: STEP_AUDIO.ibrahim41 },
+];
+
 // Arabic duas spoken by TTS during silent phases
 const STEP_DUAS = {
   ruku: 'سُبْحَانَ رَبِّيَ الْعَظِيمِ، سُبْحَانَ رَبِّيَ الْعَظِيمِ، سُبْحَانَ رَبِّيَ الْعَظِيمِ',
@@ -3400,11 +3479,15 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
   const [autoCountdown, setAutoCountdown] = useState(0);
   const [autoDuration, setAutoDuration] = useState(0);
   const [prayerComplete, setPrayerComplete] = useState(false);
+  // Multi-track state for Tashahhud + Durood + Dua sequential playback
+  const [multiTrackIdx, setMultiTrackIdx] = useState(0);
+  const [multiTrackLabel, setMultiTrackLabel] = useState('');
 
   const autoWakeLockRef = useRef(null);
   const autoStepTimerRef = useRef(null);
   const autoCountdownIntervalRef = useRef(null);
   const autoPlayRef = useRef(false);
+  const multiTrackIdxRef = useRef(0);
 
   const reciterInfo = RECITERS.find(r => r.id === reciter);
 
@@ -3462,14 +3545,15 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
         steps.push({
           phase: 'Middle Tashahhud (sitting)', arabic: 'التشهد',
           text: 'Sit and recite At-Tahiyyat: "At-tahiyyatu lillahi was-salawatu wat-tayyibat..." ending with the shahadah. Then rise saying "Allahu Akbar" to continue.',
-          audio: null, phaseType: 'sitting', duration: 25, ttsDua: STEP_DUAS.tashahhudMiddle,
+          audio: STEP_AUDIO.tashahhud, phaseType: 'sitting', duration: 25, ttsDua: null,
         });
       }
       if (i === n) {
         steps.push({
           phase: 'Final Tashahhud + Durood + Dua', arabic: 'الصلاة على النبي',
           text: 'Recite the full Tashahhud, then the complete Durood Ibrahim (salah and barakah), then close with this dua from Surah Ibrahim (14:40–41):',
-          audio: null, phaseType: 'sitting', duration: 70, ttsDua: STEP_DUAS.tashahhudFinal,
+          audio: STEP_AUDIO.tashahhud, multiAudio: TASHAHHUD_FINAL_TRACKS,
+          phaseType: 'sitting', duration: 70, ttsDua: null,
           duaArabic: 'رَبِّ اجْعَلْنِي مُقِيمَ الصَّلَاةِ وَمِنْ ذُرِّيَّتِي ۚ رَبَّنَا وَتَقَبَّلْ دُعَاءِ ﴿٤٠﴾ رَبَّنَا اغْفِرْ لِي وَلِوَالِدَيَّ وَلِلْمُؤْمِنِينَ يَوْمَ يَقُومُ الْحِسَابُ ﴿٤١﴾',
           duaTranslit: "Rabbij'alnee muqeemas-salati wa min thurriyyatee, Rabbana wa taqabbal du'a. Rabbana-ghfir lee wa liwalidayya wa lil-mu'mineena yawma yaqoomul-hisaab.",
           duaEnglish: 'My Lord, make me one who establishes prayer, and from my descendants. Our Lord, accept my supplication. Our Lord, forgive me, my parents, and the believers on the Day of Account. (Quran 14:40–41)',
@@ -3553,6 +3637,9 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
     clearInterval(autoCountdownIntervalRef.current);
     setAutoCountdown(0);
     setIsPlaying(false);
+    setMultiTrackLabel('');
+    setMultiTrackIdx(0);
+    multiTrackIdxRef.current = 0;
 
     if (audioRef.current) {
       audioRef.current.onended = null;
@@ -3572,6 +3659,9 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
 
     const s = stepsArr[stepIdx];
     setCurrentStep(stepIdx);
+    setMultiTrackIdx(0);
+    setMultiTrackLabel('');
+    multiTrackIdxRef.current = 0;
 
     clearTimeout(autoStepTimerRef.current);
     clearInterval(autoCountdownIntervalRef.current);
@@ -3586,6 +3676,7 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
       if (!autoPlayRef.current) return;
       clearInterval(autoCountdownIntervalRef.current);
       setIsPlaying(false);
+      setMultiTrackLabel('');
 
       if (stepIdx + 1 >= stepsArr.length) {
         // Prayer complete
@@ -3614,12 +3705,13 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
       }, 1000);
     };
 
-    // Speak TTS dua for silent phases
-    if (s.ttsDua && hasSpeechSynthesis) {
+    // Speak TTS dua for silent phases (only if Arabic voice available)
+    if (s.ttsDua && hasSpeechSynthesis && getArabicVoice()) {
       const u = new SpeechSynthesisUtterance(s.ttsDua);
       u.lang = 'ar-SA';
       u.rate = spd * 0.85;
       u.pitch = 1.0;
+      u.voice = getArabicVoice();
       window.speechSynthesis.cancel();
       setTimeout(() => {
         window.speechSynthesis.resume();
@@ -3627,8 +3719,50 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
       }, 100);
     }
 
-    if (s.audio && audioRef.current) {
-      // Audio step — advance on onended, use actual duration for countdown
+    if (s.multiAudio && s.multiAudio.length > 0 && audioRef.current) {
+      // Multi-track sequential playback (Tashahhud + Durood + Dua sections)
+      const tracks = s.multiAudio;
+      const fallbackDur = s.duration / spd;
+      startCountdown(fallbackDur);
+
+      function playTrack(trackIdx) {
+        if (!autoPlayRef.current) return;
+        if (trackIdx >= tracks.length) { advance(); return; }
+        const track = tracks[trackIdx];
+        multiTrackIdxRef.current = trackIdx;
+        setMultiTrackIdx(trackIdx);
+        setMultiTrackLabel(track.label);
+
+        audioRef.current.onended = null;
+        audioRef.current.onloadedmetadata = null;
+        audioRef.current.src = track.url;
+        audioRef.current.playbackRate = spd;
+
+        audioRef.current.onloadedmetadata = () => {
+          if (!autoPlayRef.current) return;
+          // Update countdown for this track's duration
+          const actualDur = audioRef.current.duration / spd;
+          clearInterval(autoCountdownIntervalRef.current);
+          startCountdown(actualDur);
+        };
+
+        audioRef.current.onended = () => {
+          if (!autoPlayRef.current) return;
+          // Small gap between tracks
+          setTimeout(() => playTrack(trackIdx + 1), 600);
+        };
+
+        audioRef.current.play()
+          .then(() => { if (autoPlayRef.current) setIsPlaying(true); })
+          .catch(() => {
+            // Track failed — skip to next after 2s
+            setTimeout(() => playTrack(trackIdx + 1), 2000);
+          });
+      }
+
+      playTrack(0);
+    } else if (s.audio && audioRef.current) {
+      // Single audio step — advance on onended, use actual duration for countdown
       const fallbackDur = s.duration / spd;
       startCountdown(fallbackDur);
 
@@ -3662,10 +3796,30 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
   }
 
   /* ---- Manual mode controls ---- */
+  function playMultiTrackManual(trackIdx) {
+    if (!step.multiAudio || !audioRef.current) return;
+    const tracks = step.multiAudio;
+    if (trackIdx >= tracks.length) { setIsPlaying(false); setMultiTrackLabel(''); return; }
+    const track = tracks[trackIdx];
+    multiTrackIdxRef.current = trackIdx;
+    setMultiTrackIdx(trackIdx);
+    setMultiTrackLabel(track.label);
+    audioRef.current.src = track.url;
+    audioRef.current.playbackRate = speed;
+    audioRef.current.onended = () => {
+      setTimeout(() => playMultiTrackManual(trackIdx + 1), 600);
+    };
+    audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+  }
+
   function togglePlay() {
     if (isPlaying) {
       audioRef.current?.pause();
+      if (audioRef.current) audioRef.current.onended = null;
       setIsPlaying(false);
+      setMultiTrackLabel('');
+    } else if (step.multiAudio && audioRef.current) {
+      playMultiTrackManual(0);
     } else if (step.audio && audioRef.current) {
       audioRef.current.src = step.audio;
       audioRef.current.playbackRate = speed;
@@ -3675,13 +3829,21 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
 
   function next() {
     audioRef.current?.pause();
+    if (audioRef.current) audioRef.current.onended = null;
     setIsPlaying(false);
+    setMultiTrackLabel('');
+    setMultiTrackIdx(0);
+    multiTrackIdxRef.current = 0;
     setCurrentStep(Math.min(currentStep + 1, steps.length - 1));
   }
 
   function prev() {
     audioRef.current?.pause();
+    if (audioRef.current) audioRef.current.onended = null;
     setIsPlaying(false);
+    setMultiTrackLabel('');
+    setMultiTrackIdx(0);
+    multiTrackIdxRef.current = 0;
     setCurrentStep(Math.max(currentStep - 1, 0));
   }
 
@@ -3782,7 +3944,7 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
                 <div className="font-arabic text-lg gold-text leading-loose text-right mb-2">{step.duaArabic}</div>
                 {step.duaTranslit && <div className="text-xs italic text-gold-dim mb-1">{step.duaTranslit}</div>}
                 {step.duaEnglish && <div className="text-xs leading-relaxed text-cream/80">{step.duaEnglish}</div>}
-                {hasSpeechSynthesis && (
+                {hasSpeechSynthesis && getArabicVoice() && (
                   <button onClick={() => speakArabic(step.duaArabic)}
                     className="mt-2 flex items-center gap-1 text-xs px-3 py-1 rounded-sm border gold-border hover:bg-gold/10 transition gold-text">
                     🔊 Hear Arabic
@@ -3799,10 +3961,21 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
                 <div className="flex items-center gap-2 text-sm gold-text">
                   <Zap className="w-4 h-4" />
                   <span>Auto-playing</span>
-                  {isPlaying && <span className="text-xs text-gold-dim">(recitation)</span>}
+                  {isPlaying && multiTrackLabel
+                    ? <span className="text-xs text-gold-dim">({multiTrackLabel})</span>
+                    : isPlaying && <span className="text-xs text-gold-dim">(recitation)</span>}
                 </div>
                 <span className="font-display text-xl tabular-nums gold-text">{autoCountdown}s</span>
               </div>
+              {/* Multi-track progress dots */}
+              {step.multiAudio && step.multiAudio.length > 1 && (
+                <div className="flex gap-1.5 mb-2">
+                  {step.multiAudio.map((t, i) => (
+                    <div key={i} title={t.label}
+                      className={`flex-1 h-1 rounded-full transition-all ${i <= multiTrackIdx ? 'bg-gold' : 'bg-gold/20'}`} />
+                  ))}
+                </div>
+              )}
               <div className="h-1.5 rounded bg-gold/15 overflow-hidden">
                 <div className="h-full bg-gold transition-all duration-1000"
                   style={{ width: `${autoDuration > 0 ? ((autoDuration - autoCountdown) / autoDuration) * 100 : 0}%` }} />
@@ -3815,17 +3988,36 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
           )}
 
           {/* Manual mode audio control */}
-          {!autoPlay && step.audio && (
-            <div className="mt-4 p-4 rounded-sm border border-gold/20 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm">
-                <Volume2 className="w-4 h-4 gold-text" />
-                <span>Recitation available</span>
+          {!autoPlay && (step.audio || step.multiAudio) && (
+            <div className="mt-4 p-4 rounded-sm border border-gold/20">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm">
+                  <Volume2 className="w-4 h-4 gold-text" />
+                  <span>{step.multiAudio ? 'Beautifully recited audio' : 'Recitation available'}</span>
+                </div>
+                <button onClick={togglePlay}
+                  className="px-4 py-2 rounded-sm bg-gold text-midnight font-semibold flex items-center gap-2 hover:bg-gold-bright transition">
+                  {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                  {isPlaying ? 'Pause' : 'Play'}
+                </button>
               </div>
-              <button onClick={togglePlay}
-                className="px-4 py-2 rounded-sm bg-gold text-midnight font-semibold flex items-center gap-2 hover:bg-gold-bright transition">
-                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                {isPlaying ? 'Pause' : 'Play'}
-              </button>
+              {/* Multi-track label and dots in manual mode */}
+              {step.multiAudio && isPlaying && (
+                <div className="mt-3">
+                  <div className="flex gap-1.5 mb-1.5">
+                    {step.multiAudio.map((t, i) => (
+                      <div key={i} title={t.label}
+                        className={`flex-1 h-1 rounded-full transition-all ${i <= multiTrackIdx ? 'bg-gold' : 'bg-gold/20'}`} />
+                    ))}
+                  </div>
+                  {multiTrackLabel && <div className="text-xs text-gold-dim italic">{multiTrackLabel}</div>}
+                </div>
+              )}
+              {step.multiAudio && !isPlaying && (
+                <div className="mt-2 text-[10px] text-gold-dim italic">
+                  Plays: At-Tahiyyat → Durood Ibrahim → Dua (Ibrahim 14:40–41) — beautifully recited
+                </div>
+              )}
             </div>
           )}
         </div>
