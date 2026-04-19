@@ -1083,9 +1083,7 @@ export default function App() {
           <WuduGuideModal onClose={() => setOpenWudu(false)} />
         )}
 
-        {openChatbot && (
-          <IslamicChatbotModal onClose={() => setOpenChatbot(false)} />
-        )}
+        <YusufFloatingChat open={openChatbot} onToggle={() => setOpenChatbot(prev => !prev)} />
 
         {/* Settings modal */}
         {showSettings && (
@@ -1966,7 +1964,7 @@ function SpeechBubble({ children, tail = 'left', className = '' }) {
   );
 }
 
-function IslamicChatbotModal({ onClose }) {
+function YusufFloatingChat({ open, onToggle }) {
   const [messages, setMessages] = useState(() => {
     try {
       const saved = localStorage.getItem('pc_chat_history');
@@ -1980,20 +1978,17 @@ function IslamicChatbotModal({ onClose }) {
   const bottomRef = useRef(null);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('pc_chat_history', JSON.stringify(messages));
-    } catch {}
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    try { localStorage.setItem('pc_chat_history', JSON.stringify(messages)); } catch {}
+    if (open) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, open]);
 
-  // Update Yusuf state based on conversation state
   useEffect(() => {
     if (loading) {
       setYusufState('thinking');
     } else {
-      const lastMsg = messages[messages.length - 1];
-      if (lastMsg && lastMsg.role === 'assistant' && messages.length > 1) {
-        if (lastMsg.content.length > 500) {
+      const last = messages[messages.length - 1];
+      if (last && last.role === 'assistant' && messages.length > 1) {
+        if (last.content.length > 500) {
           setYusufState('reading');
           const t1 = setTimeout(() => setYusufState('speaking'), 2000);
           const t2 = setTimeout(() => setYusufState('happy'), 3500);
@@ -2011,33 +2006,29 @@ function IslamicChatbotModal({ onClose }) {
     }
   }, [loading, messages]);
 
-  const userMessages = messages.filter(m => m.role === 'user');
-  const atLimit = userMessages.length >= 20;
+  const atLimit = messages.filter(m => m.role === 'user').length >= 20;
 
   async function send(text) {
     if (!text.trim() || loading || atLimit) return;
-    const userMsg = { role: 'user', content: text.trim() };
-    const newMessages = [...messages, userMsg];
+    const newMessages = [...messages, { role: 'user', content: text.trim() }];
     setMessages(newMessages);
     setInput('');
     setLoading(true);
     setError(null);
     try {
-      const apiMessages = newMessages.filter(m => m.role !== 'assistant' || messages.indexOf(m) > 0)
+      const apiMessages = newMessages
+        .filter(m => m.role !== 'assistant' || messages.indexOf(m) > 0)
         .map(m => ({ role: m.role, content: m.content }));
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: apiMessages.filter(m => m.role === 'user' || m.role === 'assistant') }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Request failed');
-      }
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Request failed'); }
       const data = await res.json();
       setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
     } catch (e) {
-      setError(e.message || 'Failed to reach assistant. Please try again.');
+      setError(e.message || 'Failed to reach assistant. Try again.');
     } finally {
       setLoading(false);
     }
@@ -2057,145 +2048,185 @@ function IslamicChatbotModal({ onClose }) {
 
   function hasArabic(text) { return /[\u0600-\u06FF]/.test(text); }
 
-  const lastAssistantMsg = [...messages].reverse().find(m => m.role === 'assistant');
   const isWelcomeOnly = messages.length === 1;
 
   return (
-    <Modal onClose={onClose}>
-      {/* Header with Yusuf + title */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-3">
-          {/* Yusuf header avatar — desktop only */}
-          <Yusuf state={yusufState} size="sm" className="hidden sm:block" aria-hidden="true" />
-          <div>
-            <div className="font-display text-2xl">Ask About Islam</div>
-            <div className="text-xs text-gold-dim">Powered by AI · Not a scholarly ruling</div>
-          </div>
-        </div>
-        <button onClick={newConversation} className="text-xs px-3 py-1 rounded-sm border gold-border hover:bg-gold/10 transition gold-text">
-          New Chat
-        </button>
-      </div>
-
-      {/* Welcome area with Yusuf — shown only on first load */}
-      {isWelcomeOnly && (
-        <div className="flex items-start gap-4 mb-4 p-3 rounded-lg" style={{ background: 'rgba(212,175,55,0.04)' }}>
-          <Yusuf state="waving" size="lg" aria-hidden="true" />
-          <div className="flex-1 min-w-0">
-            <SpeechBubble tail="left" className="mb-3">
-              <p className="font-display text-base leading-snug" style={{ color: '#0a1628' }}>
-                Assalamu alaykum! I&apos;m Yusuf — here to help you learn about Islam. Ask me anything about the Quran, Hadith, or Muslim practice.
-              </p>
-            </SpeechBubble>
-            <div className="flex flex-wrap gap-2">
-              {STARTERS.map(s => (
-                <button key={s} onClick={() => send(s)}
-                  className="text-xs px-3 py-1.5 rounded-full border gold-border hover:bg-gold/10 transition gold-text">
-                  {s}
-                </button>
-              ))}
+    <>
+      {/* ── Floating chat panel ── */}
+      {open && (
+        <div
+          className="fixed z-50 flex flex-col rounded-2xl overflow-hidden shadow-2xl"
+          style={{
+            bottom: '88px',
+            right: '24px',
+            width: '360px',
+            maxWidth: 'calc(100vw - 32px)',
+            height: '520px',
+            background: 'rgba(8, 16, 36, 0.97)',
+            border: '1px solid rgba(212,175,55,0.35)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+          }}
+        >
+          {/* Header */}
+          <div
+            className="flex items-center gap-3 px-4 py-3 flex-shrink-0"
+            style={{ borderBottom: '1px solid rgba(212,175,55,0.2)', background: 'rgba(5,10,22,0.9)' }}
+          >
+            <Yusuf state={yusufState} size="sm" aria-hidden="true" />
+            <div className="flex-1 min-w-0">
+              <div className="font-display text-lg leading-tight">Ask Yusuf</div>
+              <div className="text-[10px] text-gold-dim">Islamic Q&amp;A · Not a scholarly ruling</div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={newConversation}
+                className="text-[10px] px-2 py-1 rounded border gold-border hover:bg-gold/10 transition gold-text"
+              >
+                New
+              </button>
+              <button onClick={onToggle} className="p-1 hover:bg-white/5 rounded-full transition" aria-label="Close chat">
+                <X className="w-4 h-4 text-gold-dim" />
+              </button>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Chat window */}
-      <div className="h-64 overflow-y-auto mb-3 space-y-3 pr-1">
-        {/* Skip welcome msg in transcript — we show it in the welcome area above */}
-        {messages.slice(isWelcomeOnly ? 1 : 0).map((m, i) => (
-          <div key={i} className={`flex items-end gap-2 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            {/* Yusuf avatar next to assistant messages — mobile only */}
-            {m.role === 'assistant' && (
-              <Yusuf
-                state={i === messages.length - 2 ? yusufState : 'waving'}
-                size="sm"
-                className="sm:hidden mb-1 flex-shrink-0"
-                aria-hidden="true"
-              />
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
+
+            {/* Welcome + starters */}
+            {isWelcomeOnly && (
+              <div className="flex items-end gap-2">
+                <Yusuf state="waving" size="sm" aria-hidden="true" />
+                <div className="flex-1 min-w-0">
+                  <div
+                    className="rounded-2xl rounded-bl-sm px-3 py-2.5 text-xs leading-relaxed mb-2"
+                    style={{ background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.25)' }}
+                    role="status" aria-live="polite"
+                  >
+                    Assalamu alaykum! I&apos;m here to help you learn about Islam. Ask me anything about the Quran, Hadith, or Muslim practice.
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {STARTERS.map(s => (
+                      <button key={s} onClick={() => send(s)}
+                        className="text-[10px] px-2 py-1 rounded-full border gold-border hover:bg-gold/10 transition gold-text leading-tight">
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             )}
-            <div className={`max-w-[80%] rounded-sm px-4 py-3 text-sm ${
-              m.role === 'user'
-                ? 'bg-gold text-midnight font-medium'
-                : 'border gold-border text-cream'
-            }`} style={m.role === 'assistant' ? { background: 'rgba(212,175,55,0.05)' } : {}}>
-              {m.role === 'assistant' ? (
-                <div className="prose prose-sm max-w-none">
-                  {m.content.split('\n').map((line, li) => (
-                    <p key={li} className={`mb-1 ${hasArabic(line) ? 'font-arabic text-right text-base gold-text leading-loose' : ''}`}>
-                      {line}
-                    </p>
-                  ))}
+
+            {/* Chat transcript — skip index 0 (welcome) when shown above */}
+            {messages.slice(isWelcomeOnly ? 1 : 0).map((m, i, arr) => (
+              m.role === 'user' ? (
+                <div key={i} className="flex justify-end">
+                  <div
+                    className="max-w-[78%] px-3 py-2 rounded-2xl rounded-br-sm text-xs"
+                    style={{ background: '#d4af37', color: '#0a1628', fontWeight: 600 }}
+                  >
+                    {m.content}
+                  </div>
                 </div>
               ) : (
-                <span>{m.content}</span>
-              )}
-            </div>
-          </div>
-        ))}
-        {/* Starter chips — also show inline if we're mid-conversation and just the welcome */}
-        {!isWelcomeOnly && messages.length === 1 && (
-          <div className="flex flex-wrap gap-2 mt-2">
-            {STARTERS.map(s => (
-              <button key={s} onClick={() => send(s)}
-                className="text-xs px-3 py-1.5 rounded-full border gold-border hover:bg-gold/10 transition gold-text">
-                {s}
-              </button>
+                <div key={i} className="flex items-end gap-2">
+                  <Yusuf
+                    state={i === arr.length - 1 && !loading ? yusufState : 'waving'}
+                    size="sm"
+                    aria-hidden="true"
+                  />
+                  <div
+                    className="max-w-[78%] px-3 py-2.5 rounded-2xl rounded-bl-sm text-xs leading-relaxed"
+                    style={{ background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.2)' }}
+                    role="status" aria-live="polite"
+                  >
+                    {m.content.split('\n').filter(l => l.trim()).map((line, li) => (
+                      <p key={li} className={`mb-1 last:mb-0 ${hasArabic(line) ? 'font-arabic text-right text-sm gold-text leading-loose' : ''}`}>
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )
             ))}
+
+            {/* Loading */}
+            {loading && (
+              <div className="flex items-end gap-2">
+                <Yusuf state="thinking" size="sm" aria-hidden="true" />
+                <div
+                  className="px-3 py-2.5 rounded-2xl rounded-bl-sm text-xs text-gold-dim"
+                  style={{ background: 'rgba(212,175,55,0.06)', border: '1px solid rgba(212,175,55,0.15)' }}
+                >
+                  Thinking…
+                </div>
+              </div>
+            )}
+
+            {error && <div className="text-xs text-rose-400 text-center py-1">{error}</div>}
+            {atLimit && (
+              <div className="text-center text-xs text-gold-dim">
+                Limit reached.{' '}
+                <button onClick={newConversation} className="underline gold-text">New chat</button>
+              </div>
+            )}
+            <div ref={bottomRef} />
           </div>
-        )}
-        {loading && (
-          <div className="flex items-end gap-2 justify-start">
-            <Yusuf state="thinking" size="sm" className="sm:hidden mb-1 flex-shrink-0" aria-hidden="true" />
-            <div className="px-4 py-3 rounded-sm border gold-border text-xs text-gold-dim" style={{ background: 'rgba(212,175,55,0.05)' }}>
-              Thinking...
+
+          {/* Input */}
+          <div
+            className="px-3 py-3 flex-shrink-0"
+            style={{ borderTop: '1px solid rgba(212,175,55,0.2)', background: 'rgba(5,10,22,0.9)' }}
+          >
+            <div className="flex gap-2 items-center">
+              <input
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={handleKey}
+                placeholder="Ask about Islam…"
+                disabled={loading || atLimit}
+                className="flex-1 px-3 py-2 bg-transparent border gold-border rounded-full text-cream placeholder-gold-dim/60 focus:outline-none focus:border-gold text-xs disabled:opacity-50"
+              />
+              <button
+                onClick={() => send(input)}
+                disabled={loading || !input.trim() || atLimit}
+                className="w-9 h-9 rounded-full bg-gold text-midnight font-bold hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center flex-shrink-0 text-base"
+                aria-label="Send"
+              >
+                ↑
+              </button>
+            </div>
+            <div className="text-[9px] text-gold-dim text-center mt-1.5">
+              General info only · Consult a scholar for personal rulings
             </div>
           </div>
-        )}
-        {error && (
-          <div className="text-xs text-rose-400 text-center py-2">{error}</div>
-        )}
-        {atLimit && (
-          <div className="text-center text-xs text-gold-dim py-2">
-            Conversation limit reached. <button onClick={newConversation} className="underline gold-text">Start a new chat</button>
-          </div>
-        )}
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Desktop: Yusuf anchored left of input with latest response bubble */}
-      {!isWelcomeOnly && (
-        <div className="hidden sm:flex items-end gap-3 mb-3">
-          <Yusuf state={yusufState} size="md" aria-hidden="true" />
-          {lastAssistantMsg && (
-            <SpeechBubble tail="left" className="flex-1">
-              <p className="text-xs line-clamp-3" style={{ color: '#0a1628' }}>
-                {lastAssistantMsg.content.slice(0, 120)}{lastAssistantMsg.content.length > 120 ? '…' : ''}
-              </p>
-            </SpeechBubble>
-          )}
         </div>
       )}
 
-      {/* Input */}
-      <div className="flex gap-2 mb-2">
-        <textarea
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKey}
-          placeholder="Ask about Islam..."
-          rows={2}
-          disabled={loading || atLimit}
-          className="flex-1 px-3 py-2 bg-transparent border gold-border rounded-sm text-cream placeholder-gold-dim/60 focus:outline-none focus:border-gold text-sm resize-none disabled:opacity-50"
+      {/* ── Floating toggle button ── */}
+      <button
+        onClick={onToggle}
+        className="fixed z-50 w-16 h-16 rounded-full overflow-hidden shadow-2xl border-2 transition-transform duration-200 hover:scale-110 active:scale-95"
+        style={{
+          bottom: '24px',
+          right: '24px',
+          borderColor: '#d4af37',
+          background: '#0a1628',
+          boxShadow: open
+            ? '0 0 0 4px rgba(212,175,55,0.25), 0 8px 32px rgba(0,0,0,0.6)'
+            : '0 4px 24px rgba(0,0,0,0.5)',
+        }}
+        aria-label={open ? 'Close Yusuf chat' : 'Ask Yusuf about Islam'}
+      >
+        <img
+          src="/images/yusuf/yusuf-waving.png"
+          alt="Yusuf"
+          className="w-full h-full object-contain p-1.5"
+          style={{ filter: 'drop-shadow(0 2px 6px rgba(212,175,55,0.5))' }}
         />
-        <button onClick={() => send(input)} disabled={loading || !input.trim() || atLimit}
-          className="px-4 rounded-sm bg-gold text-midnight font-semibold hover:bg-gold-bright transition disabled:opacity-40 disabled:cursor-not-allowed text-sm">
-          Send
-        </button>
-      </div>
-      <div className="text-[10px] text-gold-dim text-center">
-        This assistant provides general information. For personal rulings, consult a qualified scholar.
-      </div>
-    </Modal>
+      </button>
+    </>
   );
 }
 
