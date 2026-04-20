@@ -468,7 +468,10 @@ export default function App() {
     try {
       const d = new Date();
       const dateStr = `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`;
-      const url = `https://api.aladhan.com/v1/timings/${dateStr}?latitude=${loc.lat}&longitude=${loc.lon}&method=${method}&school=${madhhab}`;
+      // timezonestring ensures API returns times in the correct local timezone
+      // Falls back to device timezone when location was set via GPS (no stored tz)
+      const tz = loc.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const url = `https://api.aladhan.com/v1/timings/${dateStr}?latitude=${loc.lat}&longitude=${loc.lon}&method=${method}&school=${madhhab}&timezonestring=${encodeURIComponent(tz)}`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.code === 200) {
@@ -608,9 +611,11 @@ export default function App() {
         try {
           const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`);
           const d = await r.json();
-          setLocation({ lat, lon, city: d.city || d.locality || 'Your Location', country: d.countryName || '' });
+          const deviceTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          setLocation({ lat, lon, city: d.city || d.locality || 'Your Location', country: d.countryName || '', timezone: deviceTz });
         } catch {
-          setLocation({ lat, lon, city: 'Your Location', country: '' });
+          const deviceTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          setLocation({ lat, lon, city: 'Your Location', country: '', timezone: deviceTz });
         }
       },
       () => { setError('Location denied — please enter a city'); setLoading(false); }
@@ -628,7 +633,7 @@ export default function App() {
       const d = await r.json();
       if (d.code === 200) {
         const meta = d.data.meta;
-        setLocation({ lat: meta.latitude, lon: meta.longitude, city, country });
+        setLocation({ lat: meta.latitude, lon: meta.longitude, city, country, timezone: meta.timezone });
         setTimes(d.data.timings);
         setHijriDate(d.data.date.hijri);
       } else setError('City not found');
@@ -2513,24 +2518,77 @@ function StoryDetailModal({ story, onClose }) {
    ============================================================ */
 
 const SEERAH_EPISODES = [
-  { id: 'se01', number: 1, title: 'The Arabian Peninsula Before Islam', duration: '~18 min', description: 'The social, political, and religious landscape of Arabia before the Prophet\'s birth. Tribal customs, trade, the Ka\'bah, and the spiritual darkness of Jahiliyyah.' },
-  { id: 'se02', number: 2, title: 'The Birth of Muhammad ﷺ', duration: '~20 min', description: 'The Year of the Elephant, the destruction of Abraha\'s army, and the miraculous birth of the Prophet ﷺ. His father Abdullah, mother Aminah, and grandfather Abdul Muttalib.' },
-  { id: 'se03', number: 3, title: 'Early Childhood and the Bedouin Years', duration: '~22 min', description: 'Life with his wet-nurse Halimah in the Bedouin tribe of Sa\'d. The opening of the chest (Sharh al-Sadr) and early signs of his prophethood.' },
-  { id: 'se04', number: 4, title: 'Orphanhood, Youth, and Character', duration: '~19 min', description: 'The deaths of his mother Aminah and grandfather Abdul Muttalib. Life under his uncle Abu Talib. His reputation as Al-Amin (the trustworthy) and Al-Sadiq (the truthful).' },
-  { id: 'se05', number: 5, title: 'Marriage to Khadijah (RA)', duration: '~17 min', description: 'The Prophet\'s trade journeys to Syria, his meeting with Khadijah bint Khuwaylid, and their marriage. The blessing of a loving, supportive partnership.' },
-  { id: 'se06', number: 6, title: 'The First Revelation — Iqra', duration: '~25 min', description: 'The Prophet\'s spiritual retreats in Cave Hira. The night of Laylat al-Qadr, Jibril\'s first appearance, and the first verses of Surah Al-Alaq. Khadijah\'s immediate support and Waraqah ibn Nawfal\'s testimony.' },
-  { id: 'se07', number: 7, title: 'The Early Believers', duration: '~21 min', description: 'The first Muslims: Khadijah, Ali, Zayd, and Abu Bakr (RA). The dawah in secret and the early community of faith.' },
-  { id: 'se08', number: 8, title: 'Public Preaching and Persecution', duration: '~24 min', description: 'The call to Islam goes public at Mount Safa. Qurayshi opposition, boycotts, torture of the early Muslims, and the steadfastness of Bilal, Sumayyah, and Yasir (RA).' },
-  { id: 'se09', number: 9, title: 'The Year of Grief — Abu Talib and Khadijah', duration: '~18 min', description: 'The devastating losses of his greatest protector Abu Talib and his beloved wife Khadijah in the same year. How the Prophet ﷺ endured the most difficult period of his life.' },
-  { id: 'se10', number: 10, title: 'The Night Journey — Isra and Mi\'raj', duration: '~28 min', description: 'The miraculous night journey from Makkah to Jerusalem and the ascent through the seven heavens. Meeting the prophets, seeing Paradise and Hell, and receiving the gift of five daily prayers.' },
-  { id: 'se11', number: 11, title: 'The Hijra to Madinah', duration: '~26 min', description: 'The migration to Madinah — one of the most consequential journeys in history. The Prophet\'s escape from assassination, the cave of Thawr, and the joyful reception in Madinah.' },
-  { id: 'se12', number: 12, title: 'Building the Madinah Community', duration: '~22 min', description: 'The Constitution of Madinah, brotherhood between the Muhajirun and Ansar, construction of the first mosque, and establishment of the Islamic state.' },
-  { id: 'se13', number: 13, title: 'Battle of Badr — The First Major Victory', duration: '~30 min', description: 'The turning point battle where 313 Muslims defeated an army of 1,000. The Prophet\'s du\'a, divine assistance, and the strategic brilliance that changed Islamic history.' },
-  { id: 'se14', number: 14, title: 'Battle of Uhud — Lessons in Adversity', duration: '~28 min', description: 'The near-victory that became a lesson. The archers who left their posts, the martyrdom of Hamzah (RA), and the Prophet\'s injury. Allah\'s wisdom in allowing trial.' },
-  { id: 'se15', number: 15, title: 'The Treaty of Hudaybiyyah', duration: '~23 min', description: 'The apparent diplomatic setback that was actually a great victory. The Prophet\'s wisdom in accepting terms that led to the peaceful conquest of Makkah two years later.' },
-  { id: 'se16', number: 16, title: 'The Conquest of Makkah', duration: '~25 min', description: 'The bloodless liberation of Makkah. The Prophet\'s mercy toward those who had persecuted him, his forgiveness of Abu Sufyan, and the cleansing of the Ka\'bah from idols.' },
-  { id: 'se17', number: 17, title: 'The Farewell Pilgrimage', duration: '~27 min', description: 'The Prophet\'s final Hajj in the 10th year of Hijra. The Farewell Sermon — a universal declaration of human rights, equality, and the completion of the religion.' },
-  { id: 'se18', number: 18, title: 'The Final Days and the Prophet\'s Legacy', duration: '~30 min', description: 'The Prophet\'s illness, his last visits to the mosque, and his passing on the 12th of Rabi al-Awwal. Abu Bakr\'s words: "Whoever worshipped Muhammad, Muhammad has died. Whoever worshipped Allah, He is Ever-Living."' },
+  { id: 'se01', number: 1, title: 'The Arabian Peninsula Before Islam', duration: '~18 min',
+    description: 'The social, political, and religious landscape of Arabia before the Prophet\'s birth.',
+    story: `Before the coming of Islam, the Arabian Peninsula was a land of deep contradictions. The Arabs were proud, eloquent, and fiercely loyal to their tribes — but they were also mired in idolatry, burying daughters alive, and conducting endless inter-tribal wars. The Ka\'bah in Makkah, built by Ibrahim and Ismail (AS), had been filled with over 360 idols. The Quraysh tribe, custodians of the Ka\'bah, dominated trade and wielded immense influence.\n\nArabia sat at the crossroads of three major civilizations — the Byzantine (Roman) Empire to the northwest, the Persian (Sassanid) Empire to the northeast, and the African Axumite kingdom to the southwest. Trade caravans from Yemen to Syria passed through Makkah, making it a wealthy hub. But spiritually, it was a desert. This era is called the Jahiliyyah — the Age of Ignorance.\n\nInto this darkness, Allah chose to send the final messenger. The stage was set. The world was waiting, though it did not know it. And in Makkah, in the tribe of the Quraysh, in the clan of Hashim, a child would soon be born who would change the course of human history forever.` },
+
+  { id: 'se02', number: 2, title: 'The Birth of Muhammad ﷺ', duration: '~20 min',
+    description: 'The Year of the Elephant, the miraculous birth of the Prophet ﷺ, his early family.',
+    story: `In approximately 570 CE — known as the Year of the Elephant — a remarkable event preceded the Prophet\'s birth. Abraha, the Christian ruler of Yemen and commander of the Axumite forces in Arabia, marched a massive army including war elephants toward Makkah with the intention of destroying the Ka\'bah. But as the army approached, Allah sent flocks of birds (Ababil) carrying stones of baked clay, pelting the army and annihilating it. This miraculous protection of the Ka\'bah showed that Allah had not abandoned His sacred house.\n\nIn that very year, Muhammad ﷺ was born into the noble clan of Hashim of the Quraysh tribe. His father, Abdullah ibn Abdul Muttalib, had died before his birth, making him an orphan from the womb. His mother, Aminah bint Wahb, reported experiencing a light during pregnancy so bright it illuminated the palaces of Syria. He was born on a Monday in the month of Rabi al-Awwal.\n\nHis grandfather, the revered Abdul Muttalib, took the newborn to the Ka\'bah and named him Muhammad — "The Praised One" — a name that had never been commonly used among Arabs, as if Allah had reserved it. His grandfather wept with joy, sensing something extraordinary in this child. The Prophet ﷺ was then given to his wet-nurse Thuwaybah before being sent to the Bedouin tribe of Sa\'d for upbringing.` },
+
+  { id: 'se03', number: 3, title: 'Early Childhood and the Bedouin Years', duration: '~22 min',
+    description: 'Life with Halimah in the tribe of Sa\'d. The opening of the chest and early signs.',
+    story: `Following the Arab custom of sending children to the desert to be raised by Bedouin wet-nurses — where the air was pure, language eloquent, and character strong — the infant Muhammad ﷺ was taken in by Halimah bint Abi Dhu\'ayb of the tribe of Sa\'d ibn Bakr. Initially reluctant to take an orphan (who would offer a smaller reward than a child with a living father), Halimah found no other child available and accepted him out of necessity.\n\nFrom that day, her family was blessed beyond measure. Her she-camel, previously dry, began producing abundant milk. Her goats gave more than their fill. Her crops flourished. Those around her noticed and marveled. Halimah kept Muhammad ﷺ for two years — and then two more, because the blessings continued and she could not bear to part with him.\n\nAt age four or five, while playing with other children in the fields, an extraordinary event occurred. Two men in white (angels) appeared, opened the boy\'s chest, removed his heart, cleaned it, and returned it — removing a black clot, said to be "the portion of Shaytan." This event, known as Sharh al-Sadr (the Opening of the Chest), is mentioned in the Quran (94:1). The other children ran frightened to Halimah reporting that Muhammad had been killed, but they found him standing, pale but calm. Halimah, fearing for his safety, returned him to his mother Aminah in Makkah.` },
+
+  { id: 'se04', number: 4, title: 'Orphanhood, Youth, and Character', duration: '~19 min',
+    description: 'Deaths of his mother and grandfather. Life with Abu Talib. Known as Al-Amin.',
+    story: `When Muhammad ﷺ was six years old, his mother Aminah took him to Madinah (then called Yathrib) to visit his father\'s grave and his maternal relatives. On the return journey, Aminah fell ill and passed away at a place called Al-Abwa, leaving her young son a complete orphan at age six. He returned to Makkah under the care of his faithful nursemaid Barakah (Umm Ayman), who would remain devoted to him throughout his life.\n\nHis grandfather Abdul Muttalib, then in his eighties, became his guardian and treated him with extraordinary tenderness — seating him on his own cushion, speaking of him with pride, and telling people "This child will have a great station." But two years later, when Muhammad was eight, Abdul Muttalib also died, leaving a weeping child at his side.\n\nHis uncle Abu Talib, a man of honor and poetry though he never embraced Islam, took him in and raised him alongside his own children. Muhammad ﷺ accompanied the trade caravans, worked as a shepherd, and grew up among the Quraysh. By the time he reached adulthood, all of Makkah called him Al-Amin — "The Trustworthy" — and Al-Sadiq — "The Truthful." Even his enemies acknowledged these qualities. He never lied, never cheated, never broke a promise. Long before prophethood, his character was already extraordinary.` },
+
+  { id: 'se05', number: 5, title: 'Marriage to Khadijah (RA)', duration: '~17 min',
+    description: 'Trade journeys to Syria, meeting Khadijah, and their blessed marriage.',
+    story: `Khadijah bint Khuwaylid was among the most respected women of Makkah — a twice-widowed, wealthy businesswoman of noble character who managed her own trading enterprise. Hearing of Muhammad\'s legendary honesty and trustworthiness, she hired him to lead her trade caravan to Syria. He was 25; she was 40.\n\nThe journey was a success beyond expectation. Her servant Maysarah accompanied Muhammad and witnessed remarkable things — how a monk in Syria called Bahira had told him Muhammad showed all the signs of a prophet, how two angels provided shade above him on the journey, how his dealings were always fair and blessed. Maysarah reported all of this to Khadijah upon return.\n\nKhadijah was deeply moved — not just by the profits, but by the man. Through her friend Nafisah, she proposed marriage. Muhammad ﷺ accepted, and with his uncle Abu Talib conducting the ceremony, they were married. It was a partnership of extraordinary love and mutual respect. Khadijah was his supporter, his confidante, his comfort, and his first follower. The Prophet ﷺ would later say there was no woman like her in the world — she believed in him when others doubted, supported him when others abandoned him, and gave him children. He mentioned her with love and gratitude for the rest of his life.` },
+
+  { id: 'se06', number: 6, title: 'The First Revelation — Iqra', duration: '~25 min',
+    description: 'Cave Hira, Jibril\'s appearance, the first revelation, and Khadijah\'s support.',
+    story: `By his late thirties, Muhammad ﷺ had grown increasingly reflective. He would retreat to Cave Hira on Mount Nur, outside Makkah, for days at a time — fasting, thinking, praying in the way of Ibrahim. In the month of Ramadan, in approximately 610 CE, when he was 40 years old, something happened that would change the world.\n\nThe angel Jibril (Gabriel) appeared and commanded: "Iqra!" — Read! or Recite! Muhammad was terrified and responded: "I cannot read." Three times Jibril embraced him powerfully, three times he was commanded, and then the first verses of revelation came: "Read in the name of your Lord who created — created man from a clinging substance. Read, and your Lord is Most Generous — who taught by the pen — taught man what he did not know." (Quran 96:1-5)\n\nThe Prophet ﷺ fled home trembling, asking Khadijah to cover him. She held him and spoke the words that became legendary: "By Allah, He will never disgrace you. You maintain family ties, you speak the truth, you help the poor, you honor your guest, and you support those in need." She took him to her elderly cousin Waraqah ibn Nawfal, a scholar of the earlier scriptures, who identified what had happened: "That is the same angel who came to Musa. You are the Prophet of this nation. Would that I were young and could live to the time when your people will drive you out." The era of revelation had begun.` },
+
+  { id: 'se07', number: 7, title: 'The Early Believers', duration: '~21 min',
+    description: 'The first Muslims: Khadijah, Ali, Zayd, Abu Bakr. Secret dawah.',
+    story: `The first to believe in Muhammad ﷺ was Khadijah (RA) — without hesitation, she embraced Islam the moment he returned trembling from Cave Hira. Then came Ali ibn Abi Talib (RA), the Prophet\'s young cousin living in his household, who was perhaps 10 years old. He accepted immediately when asked. Zayd ibn Harithah (RA), the Prophet\'s freed servant and adopted son, was next.\n\nAbu Bakr ibn Abi Quhafah (RA) was one of the most beloved companions of the Prophet even before revelation. When Muhammad told him about the revelation, Abu Bakr said simply: "I believe you." He then began calling others, and through him came Uthman ibn Affan, Abd al-Rahman ibn Awf, Talha ibn Ubaydullah, and Zubayr ibn al-Awwam — all future pillars of Islam. Bilal ibn Rabah (RA), an Abyssinian slave, also came to Islam early.\n\nFor three years, Islam was shared quietly and privately — in homes, in whispers, with trusted individuals. They would gather in secret, pray together, and strengthen each other. The early community was small but extraordinary in sincerity. This period of secret dawah allowed Islam to take root before the storm of public opposition that would come. Among these first believers was the seed of a civilization.` },
+
+  { id: 'se08', number: 8, title: 'Public Preaching and Persecution', duration: '~24 min',
+    description: 'Mount Safa declaration, Qurayshi opposition, torture of Bilal and Sumayyah.',
+    story: `After three years of secret preaching, the command came from Allah: "Warn your nearest kindred." (26:214) The Prophet ﷺ climbed Mount Safa and called out: "O Quraysh!" When they gathered, he asked them: "If I told you an army was behind this mountain about to attack, would you believe me?" They said: "Yes, you have never lied." Then he proclaimed Islam. His uncle Abu Lahab cursed him, and the Quran immortalized that moment in Surah Al-Masad.\n\nThe Quraysh now opposed Islam openly and viciously. They had economic, social, and religious reasons to resist — the Ka\'bah pilgrimage brought them wealth, and Islam threatened their entire power structure. Economically dependent slaves and poor Muslims were tortured in public. Bilal ibn Rabah was dragged to the blazing desert sand with a rock on his chest by his master Umayyah ibn Khalaf, yet repeated: "Ahad! Ahad!" (One! One!) — until Abu Bakr ransomed him.\n\nSumayyah bint Khabbat and her husband Yasir (RA) were subjected to brutal torture. When the Prophet ﷺ passed by their suffering and could offer no immediate relief, he said: "Be patient, O family of Yasir — your appointment is Paradise." Sumayyah was killed by Abu Jahl, becoming the first martyr in Islam. Yet the early Muslims did not waver. Their patience and certainty in the face of oppression is one of the most powerful testimonies in history.` },
+
+  { id: 'se09', number: 9, title: 'The Year of Grief — Abu Talib and Khadijah', duration: '~18 min',
+    description: 'The Prophet loses his greatest protector and his beloved wife in the same year.',
+    story: `The 10th year of prophethood brought what Muslims call the Year of Grief (\'Aam al-Huzn). Within weeks of each other, the Prophet ﷺ lost his two greatest supports in the world.\n\nAbu Talib, his uncle and protector, fell seriously ill. Without Abu Talib\'s tribal protection, the Prophet could be attacked or even killed without consequence under Arab tribal law. Abu Talib never embraced Islam — the Prophet ﷺ tried until the last moment, but Abu Talib died upon the religion of his fathers. The Prophet ﷺ wept and said of him: "I will continue to seek forgiveness for you unless I am forbidden to." (The prohibition came later in revelation.)\n\nShortly after, Khadijah (RA) — his wife of 25 years, his first and greatest supporter, the mother of his children, the one who had comforted him in the darkest moment of his prophethood — also passed away. She was approximately 65 years old. The Prophet was devastated. He had never taken another wife while she lived. He said of her: "She believed in me when people disbelieved, she supported me with her wealth when people deprived me, and she gave me children when other women did not." He would weep remembering her for the rest of his life and honor her friends even after her death.` },
+
+  { id: 'se10', number: 10, title: 'The Night Journey — Isra and Mi\'raj', duration: '~28 min',
+    description: 'From Makkah to Jerusalem, ascent through the heavens, receiving the five prayers.',
+    story: `After the Year of Grief, Allah honored His Prophet with one of the most extraordinary miracles in all of history. In a single night, the Prophet ﷺ was carried from the Masjid al-Haram in Makkah to the Masjid al-Aqsa in Jerusalem on the miraculous creature Buraq — a journey that normally took a month by camel. In Jerusalem, he led all the prophets in prayer. This is the Isra (the Night Journey).\n\nThen came the Mi\'raj — the Ascension. Ascending through the seven heavens on a ladder of light, the Prophet met and greeted the prophets at each level: Adam (AS) in the first heaven, Yahya and Isa (AS) in the second, Yusuf (AS) in the third, Idris (AS) in the fourth, Harun (AS) in the fifth, Musa (AS) in the sixth, and Ibrahim (AS) in the seventh — leaning against the Bayt al-Ma\'mur, the heavenly Ka\'bah.\n\nAt the Sidrat al-Muntaha — the Lote Tree of the Uttermost Boundary — Jibril could go no further. The Prophet ﷺ alone was brought into the presence of his Lord. Fifty daily prayers were prescribed and then, through the counsel of Musa (AS), reduced to five — each carrying the reward of fifty. The Prophet returned before the night was over. When he told Quraysh, they mocked him — but those who believed, believed deeper than ever. This night established the five daily prayers as the gift and the anchor of every Muslim\'s life.` },
+
+  { id: 'se11', number: 11, title: 'The Hijra to Madinah', duration: '~26 min',
+    description: 'The migration to Madinah — escape from assassination, Cave Thawr, joyful arrival.',
+    story: `By the 13th year of prophethood, persecution had reached a breaking point. The Quraysh convened a council and decided to kill Muhammad ﷺ. To avoid tribal blood-vengeance, they planned that one man from each clan would strike simultaneously — making the responsibility collective and unactionable. But Jibril warned the Prophet of the plan the same night it was made.\n\nThe Prophet asked Abu Bakr to accompany him. He had Ali sleep in his bed to deceive the assassins and to return the trust goods that the Makkans — even enemies — had deposited with him, because they trusted his honesty. Then, slipping past the armed men surrounding his home, the Prophet and Abu Bakr made their way south to Cave Thawr. When the Quraysh tracked them there, they stood at the cave entrance — but a spider had spun its web across the opening overnight and a pigeon had nested there. The search party concluded no one could have entered so recently. Abu Bakr whispered his fear; the Prophet replied: "Do not grieve — Allah is with us." (Quran 9:40)\n\nAfter three days, they departed northward. Upon arrival in Madinah (after 10+ days of travel), the entire city came out to receive them. The people of Madinah — who had pledged to accept Islam and protect the Prophet at the pledges of Aqabah — greeted their Prophet with overwhelming love and joy. The Hijra marks the beginning of the Islamic calendar. A new era had begun.` },
+
+  { id: 'se12', number: 12, title: 'Building the Madinah Community', duration: '~22 min',
+    description: 'Constitution of Madinah, brotherhood of Muhajirun and Ansar, first mosque.',
+    story: `The Prophet ﷺ arrived in Madinah to find a city of diverse tribes — two main Arab tribes (Aws and Khazraj, who had long been at war), three Jewish tribes (Banu Qaynuqa, Banu Nadir, Banu Qurayza), and the newly arrived Muslim migrants from Makkah (Muhajirun). Building community among them required extraordinary wisdom.\n\nFirst, the Prophet let his camel Qaswa walk freely and declared he would stay where she stopped. She stopped and knelt at a plot of land belonging to two young orphans. He purchased the land and began construction of the first mosque — Masjid an-Nabawi. The companions built it with their own hands; the Prophet worked alongside them. His mosque became the center of governance, justice, education, and worship.\n\nThe Prophet then established the brotherhood (Muakhah): each Muhajir was paired with an Ansar companion as a brother in faith. The Ansar offered their own homes, wealth, and even — in some extraordinary cases — proposed to share their wives through divorce so their Muhajir brothers would have families. Most Muhajirun graciously declined and built their own livelihoods. The Prophet also drafted the Constitution of Madinah — perhaps the world\'s first written constitution — which created a multi-faith social compact ensuring rights, responsibilities, and mutual defense among all communities of Madinah. It was statecraft of breathtaking sophistication.` },
+
+  { id: 'se13', number: 13, title: 'Battle of Badr — The First Major Victory', duration: '~30 min',
+    description: '313 Muslims defeat 1,000. The Prophet\'s du\'a, divine assistance, the turning point.',
+    story: `In the second year after Hijra, the Quraysh marched toward Madinah with 1,000 warriors — armored, armed, and confident. The Muslim force numbered 313: mostly young men, many without armor, with only two horses and 70 camels among them. They had set out to intercept a Qurayshi trade caravan and were not prepared for a full battle.\n\nThe night before, the Prophet ﷺ made du\'a with such urgency and humility that Abu Bakr came to comfort him. He prayed: "O Allah, if you let this group perish today, you will not be worshipped on earth." Then, Allah revealed: "I will reinforce you with a thousand angels, following one another." (8:9) The night before battle, Allah sent rain — softening the sandy ground for the Muslims while making the Qurayshi side difficult. He sent tranquility (sakinah) upon the believers.\n\nThe battle was swift and decisive. Many of the Quraysh\'s greatest leaders — Abu Jahl, Utbah ibn Rabi\'ah, Shaybah ibn Rabi\'ah — fell. Seventy were killed; seventy captured. The Muslims lost 14 men, all of whom were guaranteed Paradise. The victory was miraculous by any military analysis. The prisoners of war were treated with extraordinary dignity. Literate prisoners were offered freedom in exchange for teaching ten Muslims to read. Badr became the Quran\'s most celebrated battle — the day when truth was separated from falsehood.` },
+
+  { id: 'se14', number: 14, title: 'Battle of Uhud — Lessons in Adversity', duration: '~28 min',
+    description: 'The archers who left their post, the martyrdom of Hamzah (RA), the Prophet\'s injury.',
+    story: `One year after Badr, the Quraysh returned with 3,000 warriors seeking revenge. The Prophet ﷺ positioned 50 archers on a mountain pass with strict orders: "Do not leave this position — whether we win or lose." The battle began well. The Muslim cavalry and infantry pushed the Qurayshi forces into retreat.\n\nThen came the fatal mistake. Seeing the Qurayshi camp seemingly abandoned and spoils on the ground, most of the archers disobeyed their orders and descended to claim their share. Only a few remained. Khalid ibn al-Walid (then fighting for Quraysh) saw the opening, wheeled his cavalry around the mountain, and attacked the exposed Muslim rear. What had been a victory became a disaster within minutes.\n\nHamzah ibn Abdul Muttalib (RA) — the Lion of Allah, the Prophet\'s beloved uncle and one of Islam\'s greatest warriors — was martyred. The Prophet himself was struck: his face was cut, his tooth broken, he fell into a trench. Rumors spread that he had been killed. When the Muslims regrouped and found him alive, the Prophet held his companions and wept over the body of Hamzah. The lesson is eternal: obedience and discipline are not optional in worship or in war. Allah did not abandon His Prophet or His faith — but He showed with painful clarity what the cost of disobedience is. Seventy Muslims were martyred that day; each one\'s story is one of devotion and sacrifice.` },
+
+  { id: 'se15', number: 15, title: 'The Treaty of Hudaybiyyah', duration: '~23 min',
+    description: 'The apparent setback that was actually a great victory. The Prophet\'s wisdom.',
+    story: `In the 6th year after Hijra, the Prophet ﷺ set out with 1,400 companions for Umrah (pilgrimage) — unarmed, dressed in ihram, carrying only the traveler\'s sword. The Quraysh, fearing humiliation if they allowed Muslims into Makkah, blocked them at a place called Hudaybiyyah. Negotiations began.\n\nThe final treaty seemed deeply one-sided. The Muslims had to return without performing Umrah that year. Any Qurayshi who came to Madinah as a Muslim had to be returned; but any Muslim who defected to Makkah need not be returned. The treaty was to last 10 years. Umar ibn al-Khattab (RA) was outraged: "Why do we agree to humiliation in our religion?"\n\nBut the Prophet ﷺ signed. And Allah immediately revealed: "Indeed, We have given you a clear victory." (48:1) Within two years, the results vindicated the Prophet completely. The ceasefire allowed Islam to spread peacefully throughout Arabia. Thousands entered Islam during those two years — more than in the previous 19 years combined. Khalid ibn al-Walid and Amr ibn al-As, two of Arabia\'s greatest military commanders, embraced Islam during this period. When the Quraysh later violated the treaty, it gave the Prophet the moral and legal justification to march on Makkah — which he did, conquering it without bloodshed. What looked like surrender was the greatest strategic masterstroke of the entire Seerah.` },
+
+  { id: 'se16', number: 16, title: 'The Conquest of Makkah', duration: '~25 min',
+    description: 'Bloodless liberation of Makkah. The Prophet\'s mercy and forgiveness of his enemies.',
+    story: `In the 8th year after Hijra, the Quraysh violated the Treaty of Hudaybiyyah by attacking the Banu Khuza\'ah tribe (allies of the Muslims). The Prophet ﷺ prepared in secret — 10,000 warriors, the largest Muslim army ever assembled. Abu Sufyan, the leader of the Quraysh, traveled to Madinah to renew the treaty but found the Prophet unmoved. Yet when Abu Sufyan embraced Islam at the last moment, the Prophet declared: "Whoever enters the house of Abu Sufyan is safe. Whoever stays in his home is safe. Whoever enters the mosque is safe."\n\nThe army entered Makkah in four columns with almost no resistance. The Prophet ﷺ entered humbly, his head bowed so low it nearly touched his camel\'s back, reciting Surah Al-Fath. He made tawaf of the Ka\'bah and then stood at its door — facing the very people who had tortured his companions, killed his family members, driven him from his homeland, and tried to destroy his faith — and asked: "What do you think I will do with you?"\n\nThey said: "Good. You are a noble brother and the son of a noble brother." He replied: "Go — you are free." There was no retribution. No mass punishment. A city conquered. An enemy forgiven. The Ka\'bah was cleansed of its 360 idols. Bilal ibn Rabah (RA) — once a tortured slave in Makkah — climbed to the roof of the Ka\'bah and gave the first adhan over the city. The circle was complete.` },
+
+  { id: 'se17', number: 17, title: 'The Farewell Pilgrimage', duration: '~27 min',
+    description: 'The final Hajj, the Farewell Sermon — a universal declaration of human rights.',
+    story: `In the 10th year after Hijra, the Prophet ﷺ performed his one and only Hajj — the Farewell Pilgrimage (Hajjat al-Wada\'). Over 100,000 companions accompanied him. Standing on the plain of Arafat, on the 9th of Dhul Hijjah, he delivered one of the most important speeches in human history.\n\nThe Farewell Sermon declared: "Your blood, your property, and your honor are sacred among you — as sacred as this day, in this month, in this city. You are all from Adam, and Adam was from dust. No Arab has superiority over a non-Arab, nor does a non-Arab over an Arab; nor does a white person over a black person, nor a black person over a white — except through taqwa (God-consciousness). Return the trusts placed in your care. The rights of women upon you are great — treat them with kindness. I have left among you two things — if you hold to them, you will never go astray: the Book of Allah and my Sunnah."\n\nAt the end of the sermon, the revelation came: "Today I have perfected your religion for you, completed My favor upon you, and have chosen Islam as your religion." (Quran 5:3) The companions wept, sensing something final in these words. Abu Bakr (RA), who understood perhaps better than anyone, wept openly. The Prophet had come to Makkah 10 years earlier as a fugitive. He stood now as the messenger who had transformed an entire civilization. The religion was complete. His mission was done.` },
+
+  { id: 'se18', number: 18, title: 'The Final Days and the Prophet\'s Legacy', duration: '~30 min',
+    description: 'The Prophet\'s illness, last sermons, passing, and Abu Bakr\'s words to the ummah.',
+    story: `In the 11th year after Hijra, in the month of Safar, the Prophet ﷺ fell seriously ill — a fever that intensified over several weeks. Despite his weakness, he continued leading prayers until he could no longer stand. He then asked Abu Bakr (RA) to lead prayers in his place. On one of his final days, he appeared at the mosque supported by Ali and Fadl ibn Abbas, sat beside Abu Bakr, and led one prayer himself — the companions who saw him that day were overwhelmed with emotion and gratitude.\n\nIn his final days, he freed his slaves, paid his debts, and gave away everything he possessed in charity. On Monday the 12th of Rabi al-Awwal, 11 AH, the Prophet Muhammad ﷺ passed away in the room of his wife Aisha (RA), his head resting in her lap. He was 63 years old. The companions were shattered. Umar (RA), sword drawn, declared he would fight anyone who said Muhammad was dead. It was Abu Bakr (RA) who went to the room, kissed the Prophet\'s forehead, and then addressed the people:\n\n"Whoever worshipped Muhammad — Muhammad has died. But whoever worships Allah — Allah is Ever-Living and will never die." Then he recited: "Muhammad is not but a messenger. Other messengers have passed before him. If he died or was killed, would you turn back on your heels?" (3:144) At those words, Umar\'s sword fell from his hand. The ummah inhaled, steadied itself, and carried forward — carrying the message of the man who had delivered it to the world.` },
 ];
 
 function useSeerahProgress() {
@@ -2549,62 +2607,157 @@ function useSeerahProgress() {
 
 function SeerahSeriesModal({ onClose }) {
   const { completed, markComplete, markIncomplete, reset } = useSeerahProgress();
+  const [openEp, setOpenEp] = useState(null);
 
   return (
-    <Modal onClose={onClose}>
-      <div className="flex items-center gap-3 mb-2">
-        <div className="text-3xl">🌙</div>
-        <div>
-          <div className="font-display text-3xl">Seerah Series</div>
-          <div className="text-xs text-gold-dim">Life of the Prophet Muhammad ﷺ · 18 episodes</div>
-        </div>
-      </div>
-
-      {/* Progress summary */}
-      <div className="mb-5 p-3 rounded-sm border border-gold/20 flex items-center justify-between">
-        <div>
-          <div className="text-sm gold-text font-display">{completed.length} of {SEERAH_EPISODES.length} episodes completed</div>
-          <div className="h-1.5 rounded bg-gold/15 overflow-hidden mt-1.5 w-48">
-            <div className="h-full bg-gold transition-all" style={{ width: `${(completed.length / SEERAH_EPISODES.length) * 100}%` }} />
+    <>
+      <Modal onClose={onClose}>
+        <div className="flex items-center gap-3 mb-2">
+          <div className="text-3xl">🌙</div>
+          <div>
+            <div className="font-display text-3xl">Seerah Series</div>
+            <div className="text-xs text-gold-dim">Life of the Prophet Muhammad ﷺ · 18 episodes · Tap any card to read & listen</div>
           </div>
         </div>
-        {completed.length > 0 && (
-          <button onClick={() => { if (window.confirm('Reset all Seerah progress?')) reset(); }}
-            className="text-xs text-rose-400 hover:underline">Reset progress</button>
-        )}
-      </div>
 
-      <div className="space-y-2">
-        {SEERAH_EPISODES.map(ep => {
-          const isDone = completed.includes(ep.id);
-          return (
-            <div key={ep.id}
-              className={`p-4 rounded-sm border transition ${isDone ? 'border-gold/40 bg-gold/8 opacity-75' : 'gold-border bg-transparent'}`}>
-              <div className="flex items-start gap-3">
-                <button
-                  onClick={() => isDone ? markIncomplete(ep.id) : markComplete(ep.id)}
-                  className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition ${
-                    isDone ? 'border-gold bg-gold text-midnight' : 'border-gold/40 hover:border-gold'
-                  }`}>
-                  {isDone && <Check className="w-3 h-3" />}
-                </button>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2 mb-0.5">
-                    <div className={`font-display text-base ${isDone ? 'line-through text-gold-dim' : ''}`}>
-                      {ep.number}. {ep.title}
-                    </div>
-                    <div className="text-[10px] text-gold-dim flex-shrink-0">{ep.duration}</div>
-                  </div>
-                  <div className="text-xs text-gold-dim leading-relaxed">{ep.description}</div>
-                </div>
-              </div>
+        {/* Progress summary */}
+        <div className="mb-5 p-3 rounded-sm border border-gold/20 flex items-center justify-between">
+          <div>
+            <div className="text-sm gold-text font-display">{completed.length} of {SEERAH_EPISODES.length} episodes completed</div>
+            <div className="h-1.5 rounded bg-gold/15 overflow-hidden mt-1.5 w-48">
+              <div className="h-full bg-gold transition-all" style={{ width: `${(completed.length / SEERAH_EPISODES.length) * 100}%` }} />
             </div>
-          );
-        })}
+          </div>
+          {completed.length > 0 && (
+            <button onClick={() => { if (window.confirm('Reset all Seerah progress?')) reset(); }}
+              className="text-xs text-rose-400 hover:underline">Reset progress</button>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          {SEERAH_EPISODES.map(ep => {
+            const isDone = completed.includes(ep.id);
+            return (
+              <button key={ep.id}
+                onClick={() => setOpenEp(ep)}
+                className={`w-full text-left p-4 rounded-sm border transition hover:scale-[1.01] active:scale-[0.99] ${
+                  isDone ? 'border-gold/40 bg-gold/8 opacity-80' : 'gold-border hover:bg-gold/5'
+                }`}>
+                <div className="flex items-start gap-3">
+                  <div
+                    onClick={e => { e.stopPropagation(); isDone ? markIncomplete(ep.id) : markComplete(ep.id); }}
+                    className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition cursor-pointer ${
+                      isDone ? 'border-gold bg-gold text-midnight' : 'border-gold/40 hover:border-gold'
+                    }`}>
+                    {isDone && <Check className="w-3 h-3" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <div className={`font-display text-base ${isDone ? 'line-through text-gold-dim' : ''}`}>
+                        {ep.number}. {ep.title}
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="text-[10px] text-gold-dim">{ep.duration}</div>
+                        <ChevronRight className="w-3 h-3 text-gold-dim" />
+                      </div>
+                    </div>
+                    <div className="text-xs text-gold-dim leading-relaxed">{ep.description}</div>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-5 text-[10px] text-gold-dim text-center italic">
+          Tap any episode to read the story and listen via narration. Tap the circle to mark completed.
+        </div>
+      </Modal>
+
+      {openEp && (
+        <SeerahEpisodeModal ep={openEp} onClose={() => setOpenEp(null)}
+          isDone={completed.includes(openEp.id)}
+          onToggleDone={() => completed.includes(openEp.id) ? markIncomplete(openEp.id) : markComplete(openEp.id)} />
+      )}
+    </>
+  );
+}
+
+function SeerahEpisodeModal({ ep, onClose, isDone, onToggleDone }) {
+  const [isNarrating, setIsNarrating] = useState(false);
+
+  useEffect(() => {
+    return () => stopSpeaking();
+  }, []);
+
+  async function playNarration() {
+    if (isNarrating) { stopSpeaking(); setIsNarrating(false); return; }
+    setIsNarrating(true);
+    try {
+      const text = `Episode ${ep.number}: ${ep.title}.\n\n${ep.story}`;
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, language: 'en-US' }),
+      });
+      if (!res.ok) throw new Error('TTS failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      _arabicAudioRef = audio;
+      audio.onended = () => { setIsNarrating(false); URL.revokeObjectURL(url); };
+      audio.onerror = () => { setIsNarrating(false); URL.revokeObjectURL(url); };
+      await audio.play();
+    } catch {
+      // Fallback: use browser speech synthesis for English
+      if ('speechSynthesis' in window) {
+        const utt = new SpeechSynthesisUtterance(`Episode ${ep.number}: ${ep.title}. ${ep.story}`);
+        utt.lang = 'en-US';
+        utt.rate = 0.9;
+        utt.onend = () => setIsNarrating(false);
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utt);
+      } else {
+        setIsNarrating(false);
+      }
+    }
+  }
+
+  return (
+    <Modal onClose={() => { stopSpeaking(); setIsNarrating(false); onClose(); }}>
+      <div className="flex items-start gap-3 mb-5">
+        <div className="text-3xl">🌙</div>
+        <div className="flex-1">
+          <div className="text-xs uppercase tracking-widest gold-text mb-1">Episode {ep.number} · {ep.duration}</div>
+          <div className="font-display text-2xl leading-tight">{ep.title}</div>
+        </div>
       </div>
 
-      <div className="mt-5 text-[10px] text-gold-dim text-center italic">
-        This curriculum follows the authentic Seerah. For full audio, explore lectures by Sheikh Yasir Qadhi, Omar Suleiman, or Mufti Menk on their official channels. Tap the circle to mark episodes as completed.
+      {/* Story text */}
+      <div className="space-y-4 mb-6">
+        {ep.story.split('\n\n').map((para, i) => (
+          <p key={i} className="text-sm leading-relaxed">{para}</p>
+        ))}
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <button onClick={playNarration}
+          className={`flex items-center gap-2 px-4 py-2 rounded-sm border text-sm transition ${
+            isNarrating ? 'border-gold bg-gold/20 gold-text' : 'gold-border hover:bg-gold/10 gold-text'
+          }`}>
+          {isNarrating ? '⏸ Stop' : '▶ Listen'}
+        </button>
+        <button onClick={() => { onToggleDone(); }}
+          className={`flex items-center gap-2 px-4 py-2 rounded-sm border text-sm transition ${
+            isDone ? 'border-gold bg-gold text-midnight' : 'gold-border hover:bg-gold/10 gold-text'
+          }`}>
+          {isDone ? '✓ Completed' : 'Mark Complete'}
+        </button>
+      </div>
+
+      <div className="mt-5 text-[10px] text-gold-dim italic">
+        For in-depth audio lectures on this episode, search "Seerah {ep.title}" by Sheikh Yasir Qadhi, Omar Suleiman, or Mufti Menk on YouTube.
       </div>
     </Modal>
   );
@@ -3048,14 +3201,19 @@ function TodaysReflection() {
   async function fetchVerse() {
     setVerseLoading(true);
     try {
-      // AlQuran.cloud — returns both Arabic (quran-uthmani) and English (en.sahih) in one call,
-      // no API key needed, reliably includes translation text
-      const res = await fetch('https://api.alquran.cloud/v1/ayah/random/editions/quran-uthmani,en.sahih');
+      // Use day-of-year to pick a consistent, deterministic daily ayah (avoids "random" endpoint flakiness)
+      const doy = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
+      const ayahNum = ((doy * 17) % 6235) + 2; // 1-indexed, skip ayah 1 (Fatiha shared with prayer)
+      const res = await fetch(`https://api.alquran.cloud/v1/ayah/${ayahNum}/editions/quran-uthmani,en.sahih`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      if (data.code !== 200 || !Array.isArray(data.data) || data.data.length < 2) {
+        throw new Error('Unexpected API response');
+      }
       const [arVerse, enVerse] = data.data;
       const arabic  = arVerse.text;
       const english = enVerse.text;
+      if (!english) throw new Error('No English translation returned');
       const chapterId = arVerse.surah.number;
       const verseNum   = arVerse.numberInSurah;
       const surahName  = enVerse.surah.englishName || arVerse.surah.name;
@@ -3066,7 +3224,19 @@ function TodaysReflection() {
       setVerseDateKey(todayKey);
     } catch (e) {
       console.error('fetchVerse error:', e);
-      // Only keep old cache if it has usable English text; otherwise leave loading=false with null
+      // Show a beautiful fallback verse when API is unavailable
+      if (!verse?.english) {
+        const FALLBACK_VERSES = [
+          { arabic: 'إِنَّ مَعَ الْعُسْرِ يُسْرًا', english: 'Indeed, with hardship will be ease.', citation: 'Ash-Sharh 94:6', audioUrl: 'https://everyayah.com/data/Alafasy_128kbps/094006.mp3' },
+          { arabic: 'وَمَن يَتَوَكَّلْ عَلَى اللَّهِ فَهُوَ حَسْبُهُ', english: 'And whoever relies upon Allah — then He is sufficient for him.', citation: 'At-Talaq 65:3', audioUrl: 'https://everyayah.com/data/Alafasy_128kbps/065003.mp3' },
+          { arabic: 'فَاذْكُرُونِي أَذْكُرْكُمْ', english: 'So remember Me; I will remember you.', citation: 'Al-Baqarah 2:152', audioUrl: 'https://everyayah.com/data/Alafasy_128kbps/002152.mp3' },
+          { arabic: 'وَلَا تَهِنُوا وَلَا تَحْزَنُوا وَأَنتُمُ الْأَعْلَوْنَ', english: 'Do not weaken and do not grieve, and you will be superior.', citation: 'Ali \'Imran 3:139', audioUrl: 'https://everyayah.com/data/Alafasy_128kbps/003139.mp3' },
+          { arabic: 'وَهُوَ مَعَكُمْ أَيْنَ مَا كُنتُمْ', english: 'And He is with you wherever you are.', citation: 'Al-Hadid 57:4', audioUrl: 'https://everyayah.com/data/Alafasy_128kbps/057004.mp3' },
+        ];
+        const doy = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
+        setVerse(FALLBACK_VERSES[doy % FALLBACK_VERSES.length]);
+        setVerseDateKey(todayKey);
+      }
     } finally {
       setVerseLoading(false);
     }
@@ -3113,6 +3283,11 @@ function TodaysReflection() {
           )}
           {!verse && !verseLoading && (
             <button onClick={fetchVerse} className="text-sm gold-text hover:underline">Load today's verse</button>
+          )}
+          {verse && !verseLoading && (
+            <button onClick={fetchVerse} className="mt-3 text-[10px] text-gold-dim hover:text-gold transition flex items-center gap-1" title="Refresh verse">
+              ↻ New verse
+            </button>
           )}
         </div>
 
@@ -3530,28 +3705,57 @@ function MoodDuaModal({ moodKey, onClose }) {
    GUIDED PRAYER — step-by-step with auto-play mode
    ============================================================ */
 
-// Beautifully recited audio for key prayer steps — served from local public/audio/prayer/
-// Files to place: tashahhud.mp3, durood.mp3, ibrahim40.mp3, ibrahim41.mp3
-// Format: MP3, 128–192kbps, mono or stereo both fine
-const STEP_AUDIO = {
-  // At-Tahiyyat (Tashahhud) — save as public/audio/prayer/tashahhud.mp3
-  tashahhud: '/audio/prayer/tashahhud.mp3',
-  // Durood Ibrahim (complete) — save as public/audio/prayer/durood.mp3
-  durood: '/audio/prayer/durood.mp3',
-  // Surah Ibrahim 14:40 (Alafasy) — save as public/audio/prayer/ibrahim40.mp3
-  ibrahim40: '/audio/prayer/ibrahim40.mp3',
-  // Surah Ibrahim 14:41 (Alafasy) — save as public/audio/prayer/ibrahim41.mp3
-  ibrahim41: '/audio/prayer/ibrahim41.mp3',
+// Versioned prayer audio — 3 recitations for each section.
+// Sequence: Tashahhud → Durood → Dua (one file each, played in order).
+// Auto-prayer always uses version 1 (index 0).
+// Manual/other prayers cycle through versions, advancing each time.
+const PRAYER_AUDIO_VERSIONS = {
+  tashahhud: [
+    '/audio/prayer/tashahhud-1.mp3', // Attahiyat recitation
+    '/audio/prayer/tashahhud-2.mp3', // Egzon Ibrahimi
+    '/audio/prayer/tashahhud-3.mp3', // Egzon Ibrahimi (alt)
+  ],
+  durood: [
+    '/audio/prayer/durood-1.mp3', // Peshawa Qadir al Kurdi (short)
+    '/audio/prayer/durood-2.mp3', // Peshawa Qadir Al Kurdi (full)
+    '/audio/prayer/durood-3.mp3', // Sheikh Egzon Ibrahimi
+  ],
+  dua: [
+    '/audio/prayer/dua-1.mp3', // Rabbi jalni (standard)
+    '/audio/prayer/dua-2.mp3', // Rabbi jalni m
+    '/audio/prayer/dua-3.mp3', // Rabij Al Ni
+  ],
 };
 
-// Sequential audio files for the Final Tashahhud + Durood + Dua step.
-// Each section plays one after the other in the step.
-const TASHAHHUD_FINAL_TRACKS = [
-  { label: 'At-Tahiyyat (Tashahhud)', url: STEP_AUDIO.tashahhud },
-  { label: 'Durood Ibrahim', url: STEP_AUDIO.durood },
-  { label: 'Dua — Ibrahim 14:40', url: STEP_AUDIO.ibrahim40 },
-  { label: 'Dua — Ibrahim 14:41', url: STEP_AUDIO.ibrahim41 },
-];
+// Returns the URL for a given version index (0–2) of a prayer section.
+function getPrayerAudioUrl(section, versionIdx) {
+  const versions = PRAYER_AUDIO_VERSIONS[section];
+  return versions[versionIdx % versions.length];
+}
+
+// Reads the current manual cycle index from localStorage (default 0).
+function getManualCycleIdx() {
+  return parseInt(localStorage.getItem('prayer_manual_cycle') || '0', 10);
+}
+
+// Advances the manual cycle index and saves to localStorage.
+function advanceManualCycle() {
+  const next = (getManualCycleIdx() + 1) % 3;
+  localStorage.setItem('prayer_manual_cycle', String(next));
+  return next;
+}
+
+// Build the 3-track sequence for a given version index (Tashahhud → Durood → Dua).
+function buildPrayerTracks(versionIdx) {
+  return [
+    { label: 'At-Tahiyyat (Tashahhud)', url: getPrayerAudioUrl('tashahhud', versionIdx) },
+    { label: 'Durood Ibrahim', url: getPrayerAudioUrl('durood', versionIdx) },
+    { label: 'Dua (closing supplication)', url: getPrayerAudioUrl('dua', versionIdx) },
+  ];
+}
+
+// Auto-prayer always uses version 1 (index 0) — consistent, no cycling.
+const AUTO_PRAYER_TRACKS = buildPrayerTracks(0);
 
 // Arabic duas spoken by TTS during silent phases
 const STEP_DUAS = {
@@ -3578,12 +3782,11 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
   // Manual mode: which group button is actively playing (null | 0 | 1 | 2)
   const [manualGroupPlaying, setManualGroupPlaying] = useState(null);
 
-  // Manual-mode button groups for the Tashahhud step
-  // Each group maps to indices within step.multiAudio
+  // Manual-mode button groups for the Tashahhud step (each maps to one track index)
   const MANUAL_GROUPS = [
     { label: 'At-Tahiyyat', sublabel: 'Tashahhud', indices: [0] },
     { label: 'Durood Ibrahim', sublabel: 'Salawat upon the Prophet ﷺ', indices: [1] },
-    { label: 'Dua', sublabel: 'Surah Ibrahim 14:40–41', indices: [2, 3] },
+    { label: 'Dua', sublabel: 'Closing supplication', indices: [2] },
   ];
 
   const autoWakeLockRef = useRef(null);
@@ -3648,14 +3851,14 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
         steps.push({
           phase: 'Middle Tashahhud (sitting)', arabic: 'التشهد',
           text: 'Sit and recite At-Tahiyyat: "At-tahiyyatu lillahi was-salawatu wat-tayyibat..." ending with the shahadah. Then rise saying "Allahu Akbar" to continue.',
-          audio: STEP_AUDIO.tashahhud, phaseType: 'sitting', duration: 25, ttsDua: null,
+          audio: AUTO_PRAYER_TRACKS[0].url, phaseType: 'sitting', duration: 25, ttsDua: null,
         });
       }
       if (i === n) {
         steps.push({
           phase: 'Final Tashahhud + Durood + Dua', arabic: 'الصلاة على النبي',
           text: 'Recite the full Tashahhud, then the complete Durood Ibrahim (salah and barakah), then close with this dua from Surah Ibrahim (14:40–41):',
-          audio: STEP_AUDIO.tashahhud, multiAudio: TASHAHHUD_FINAL_TRACKS,
+          audio: AUTO_PRAYER_TRACKS[0].url, multiAudio: AUTO_PRAYER_TRACKS,
           phaseType: 'sitting', duration: 70, ttsDua: null,
           duaArabic: 'رَبِّ اجْعَلْنِي مُقِيمَ الصَّلَاةِ وَمِنْ ذُرِّيَّتِي ۚ رَبَّنَا وَتَقَبَّلْ دُعَاءِ ﴿٤٠﴾ رَبَّنَا اغْفِرْ لِي وَلِوَالِدَيَّ وَلِلْمُؤْمِنِينَ يَوْمَ يَقُومُ الْحِسَابُ ﴿٤١﴾',
           duaTranslit: "Rabbij'alnee muqeemas-salati wa min thurriyyatee, Rabbana wa taqabbal du'a. Rabbana-ghfir lee wa liwalidayya wa lil-mu'mineena yawma yaqoomul-hisaab.",
@@ -3940,9 +4143,10 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
   }
 
   // Play one of the 3 manual groups (Tashahhud / Durood / Dua)
-  // In auto-play mode this is never called — auto-play uses runAutoStep's multiAudio chain
+  // Uses the manual cycle index so each prayer session uses the next recitation version.
+  // In auto-play mode this is never called — auto-play uses runAutoStep's multiAudio chain.
   function playGroup(groupIdx) {
-    if (!step.multiAudio || !audioRef.current) return;
+    if (!audioRef.current) return;
     const group = MANUAL_GROUPS[groupIdx];
 
     // Toggle off if same group already playing
@@ -3962,13 +4166,18 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
     setAudioUnavailable(false);
     setManualGroupPlaying(groupIdx);
 
+    // Build tracks using current manual cycle index, then advance for next time
+    const cycleIdx = getManualCycleIdx();
+    const manualTracks = buildPrayerTracks(cycleIdx);
+    advanceManualCycle();
+
     function playAt(pos) {
       if (pos >= group.indices.length) {
         setIsPlaying(false);
         setManualGroupPlaying(null);
         return;
       }
-      const track = step.multiAudio[group.indices[pos]];
+      const track = manualTracks[group.indices[pos]];
       audioRef.current.src = track.url;
       audioRef.current.playbackRate = speed;
       audioRef.current.onended = () => setTimeout(() => playAt(pos + 1), 400);
