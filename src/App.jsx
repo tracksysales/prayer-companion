@@ -603,22 +603,35 @@ export default function App() {
   }, [wakeLockActive]); // eslint-disable-line
 
   async function useMyLocation() {
-    if (!navigator.geolocation) { setError('Geolocation not supported'); return; }
-    setLoading(true);
+    if (!navigator.geolocation) { setError('Geolocation not supported by your browser — please enter your city or ZIP code below'); return; }
+    setLoading(true); setError(null);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const lat = pos.coords.latitude, lon = pos.coords.longitude;
         try {
-          const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`);
+          const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`, { headers: { 'Accept-Language': 'en' } });
           const d = await r.json();
+          const addr = d.address || {};
+          const city = addr.city || addr.town || addr.village || addr.county || 'Your Location';
+          const country = addr.country || '';
           const deviceTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-          setLocation({ lat, lon, city: d.city || d.locality || 'Your Location', country: d.countryName || '', timezone: deviceTz });
+          setLocation({ lat, lon, city, country, timezone: deviceTz });
         } catch {
           const deviceTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
           setLocation({ lat, lon, city: 'Your Location', country: '', timezone: deviceTz });
         }
       },
-      () => { setError('Location denied — please enter a city'); setLoading(false); }
+      (err) => {
+        setLoading(false);
+        if (err.code === 1) {
+          setError('Location access was denied. To use this feature, allow location access in your browser settings, then refresh — or enter your city or ZIP code below.');
+        } else if (err.code === 2) {
+          setError('Location unavailable. Please enter your city or ZIP code below.');
+        } else {
+          setError('Location request timed out. Please enter your city or ZIP code below.');
+        }
+      },
+      { timeout: 10000, maximumAge: 300000, enableHighAccuracy: false }
     );
   }
 
@@ -626,18 +639,63 @@ export default function App() {
     if (!cityInput.trim()) return;
     setLoading(true); setError(null);
     try {
-      const parts = cityInput.split(',').map(s => s.trim());
-      const city = parts[0], country = parts[1] || '';
-      const url = `https://api.aladhan.com/v1/timingsByCity?city=${encodeURIComponent(city)}&country=${encodeURIComponent(country)}&method=${method}&school=${madhhab}`;
-      const r = await fetch(url);
-      const d = await r.json();
-      if (d.code === 200) {
-        const meta = d.data.meta;
-        setLocation({ lat: meta.latitude, lon: meta.longitude, city, country, timezone: meta.timezone });
-        setTimes(d.data.timings);
-        setHijriDate(d.data.date.hijri);
-      } else setError('City not found');
-    } catch { setError('Failed to look up city'); }
+      const input = cityInput.trim();
+      // Detect US zip code (5 digits) or postal code patterns
+      const isZipOrPostal = /^\d{5}(-\d{4})?$/.test(input) || /^[A-Za-z]\d[A-Za-z]\s?\d[A-Za-z]\d$/.test(input);
+
+      let lat, lon, displayCity, displayCountry, timezone;
+
+      if (isZipOrPostal) {
+        // Use Nominatim geocoding to resolve zip/postal to coordinates
+        const geoUrl = `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(input)}&countrycodes=us,ca&format=json&limit=1&addressdetails=1`;
+        const geoRes = await fetch(geoUrl, { headers: { 'Accept-Language': 'en' } });
+        const geoData = await geoRes.json();
+        if (!geoData.length) {
+          setError('ZIP/postal code not found — try entering your city name');
+          setLoading(false);
+          return;
+        }
+        lat = parseFloat(geoData[0].lat);
+        lon = parseFloat(geoData[0].lon);
+        const addr = geoData[0].address || {};
+        displayCity = addr.city || addr.town || addr.village || addr.county || input;
+        displayCountry = addr.country || '';
+        timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      } else {
+        // Use Nominatim to geocode city name for reliable lat/lon + timezone
+        const parts = input.split(',').map(s => s.trim());
+        const city = parts[0], country = parts[1] || '';
+        const geoUrl = `https://nominatim.openstreetmap.org/search?city=${encodeURIComponent(city)}${country ? `&country=${encodeURIComponent(country)}` : ''}&format=json&limit=1&addressdetails=1`;
+        const geoRes = await fetch(geoUrl, { headers: { 'Accept-Language': 'en' } });
+        const geoData = await geoRes.json();
+        if (!geoData.length) {
+          setError('City not found — try adding a country (e.g., "London, UK")');
+          setLoading(false);
+          return;
+        }
+        lat = parseFloat(geoData[0].lat);
+        lon = parseFloat(geoData[0].lon);
+        const addr = geoData[0].address || {};
+        displayCity = addr.city || addr.town || addr.village || city;
+        displayCountry = addr.country || country;
+        timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      }
+
+      // Fetch prayer times by coordinates for accurate timezone-based results
+      const d = new Date();
+      const dateStr = `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`;
+      const timingsUrl = `https://api.aladhan.com/v1/timings/${dateStr}?latitude=${lat}&longitude=${lon}&method=${method}&school=${madhhab}&timezonestring=${encodeURIComponent(timezone)}`;
+      const r = await fetch(timingsUrl);
+      const data = await r.json();
+      if (data.code === 200) {
+        const meta = data.data.meta;
+        setLocation({ lat, lon, city: displayCity, country: displayCountry, timezone: meta.timezone || timezone });
+        setTimes(data.data.timings);
+        setHijriDate(data.data.date.hijri);
+      } else {
+        setError('Could not load prayer times for this location');
+      }
+    } catch { setError('Failed to look up location — check your connection'); }
     finally { setLoading(false); }
   }
 
@@ -709,7 +767,7 @@ export default function App() {
             <div className="flex gap-2">
               <input value={cityInput} onChange={e => setCityInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && setCityManually()}
-                placeholder="City, Country (e.g., Frisco, USA)"
+                placeholder="City, Country or ZIP code (e.g., 10001 or Frisco, TX)"
                 className="flex-1 px-4 py-3 bg-transparent border gold-border rounded-sm text-cream placeholder-gold-dim/60 focus:outline-none focus:border-gold" />
               <button onClick={setCityManually}
                 className="px-5 rounded-sm bg-gold text-midnight font-semibold hover:bg-gold-bright transition">
