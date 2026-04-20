@@ -56,13 +56,10 @@ export default defineConfig({
             },
           },
           {
-            // Cache local audio files from /audio/
+            // Local audio files — NetworkOnly so the browser's native Range request
+            // handling works correctly (CacheFirst breaks audio seeking/buffering)
             urlPattern: /\/audio\/.*\.mp3$/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'local-audio-cache',
-              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 90 },
-            },
+            handler: 'NetworkOnly',
           },
         ],
       },
