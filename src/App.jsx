@@ -448,6 +448,7 @@ export default function App() {
   const [openChatbot, setOpenChatbot] = useState(false);
   const [openAyatulKursi, setOpenAyatulKursi] = useState(false);
   const [guidedRakats, setGuidedRakats] = useState(2);
+  const [guidedSurah, setGuidedSurah] = useState(null);
 
   const adhanAudioRef = useRef(null);
   const guidedAudioRef = useRef(null);
@@ -872,7 +873,7 @@ export default function App() {
 
             {/* Action cards */}
             <div className="grid md:grid-cols-3 gap-4 mb-4">
-              <button onClick={() => setOpenGuided(true)}
+              <button onClick={() => { if (SURAH_LIST.length > 0) { setGuidedSurah(SURAH_LIST[getSurahIdx()]); advanceSurahIdx(); } setOpenGuided(true); }}
                 className="p-6 rounded-sm border gold-border text-left hover:bg-gold/5 transition">
                 <Headphones className="w-8 h-8 gold-text mb-3" />
                 <div className="font-display text-2xl mb-1">Guided Prayer</div>
@@ -1064,7 +1065,7 @@ export default function App() {
               <div className="text-xs uppercase tracking-widest gold-text mb-2">History & Tradition</div>
               <div className="text-sm leading-relaxed">{PRAYERS[openPrayer].history}</div>
             </div>
-            <button onClick={() => { setOpenPrayer(null); setOpenGuided(true); }}
+            <button onClick={() => { setOpenPrayer(null); if (SURAH_LIST.length > 0) { setGuidedSurah(SURAH_LIST[getSurahIdx()]); advanceSurahIdx(); } setOpenGuided(true); }}
               className="w-full py-3 rounded-sm bg-gold text-midnight font-semibold hover:bg-gold-bright transition flex items-center justify-center gap-2">
               <Headphones className="w-4 h-4" /> Open Guided Prayer
             </button>
@@ -1090,6 +1091,7 @@ export default function App() {
             setReciter={setGuidedReciter}
             speed={guidedSpeed}
             setSpeed={setGuidedSpeed}
+            surah={guidedSurah}
             audioRef={guidedAudioRef}
             onClose={() => setOpenGuided(false)}
           />
@@ -3815,6 +3817,24 @@ function buildPrayerTracks(versionIdx) {
 // Auto-prayer always uses version 1 (index 0) — consistent, no cycling.
 const AUTO_PRAYER_TRACKS = buildPrayerTracks(0);
 
+// Auto-detect Surah files placed in src/assets/surah/ — any Surah*.mp3 added there
+// is automatically picked up at the next build with no code changes needed.
+const _surahGlob = import.meta.glob('./assets/surah/Surah*.mp3', { eager: true, query: '?url', import: 'default' });
+const SURAH_LIST = Object.entries(_surahGlob)
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([path, url]) => ({
+    name: path.split('/').pop().replace('.mp3', ''),
+    url,
+  }));
+
+function getSurahIdx() {
+  return parseInt(localStorage.getItem('pc_surah_idx') || '0', 10);
+}
+function advanceSurahIdx() {
+  if (SURAH_LIST.length === 0) return;
+  localStorage.setItem('pc_surah_idx', String((getSurahIdx() + 1) % SURAH_LIST.length));
+}
+
 // Arabic duas spoken by TTS during silent phases
 const STEP_DUAS = {
   ruku: 'سُبْحَانَ رَبِّيَ الْعَظِيمِ، سُبْحَانَ رَبِّيَ الْعَظِيمِ، سُبْحَانَ رَبِّيَ الْعَظِيمِ',
@@ -3826,7 +3846,7 @@ const STEP_DUAS = {
   tasleem: 'السَّلَامُ عَلَيْكُمْ وَرَحْمَةُ اللَّهِ',
 };
 
-function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed, audioRef, onClose }) {
+function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed, surah, audioRef, onClose }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [autoPlay, setAutoPlay] = useState(false);
@@ -3871,12 +3891,24 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
     for (let i = 1; i <= n; i++) {
       steps.push({
         phase: `Rakat ${i} — Qiyam`, arabic: 'القيام',
-        text: 'Place your right hand over your left on your chest. Recite the opening (Thana), then Al-Fatiha, then a short surah (only in first 2 rakats).',
+        text: i <= 2
+          ? 'Place your right hand over your left on your chest. Recite the opening (Thana), then Al-Fatiha. A short Surah will play on the next step.'
+          : 'Place your right hand over your left on your chest. Recite the opening (Thana), then Al-Fatiha only — no additional Surah in rakats 3 and 4.',
         audio: reciterInfo?.fullFatiha,
         phaseType: 'standing',
-        duration: i <= 2 ? 55 : 42,
+        duration: i <= 2 ? 45 : 42,
         ttsDua: null,
       });
+      if (i <= 2 && surah) {
+        steps.push({
+          phase: `Rakat ${i} — Surah`, arabic: 'السورة',
+          text: `Continue standing. Listen to ${surah.name} — recite along if you are able.`,
+          audio: surah.url,
+          phaseType: 'standing',
+          duration: 30,
+          ttsDua: null,
+        });
+      }
       steps.push({
         phase: `Rakat ${i} — Ruku`, arabic: 'الركوع',
         text: 'Say "Allahu Akbar" and bow, placing hands on knees. Say "Subhana Rabbiyal-Adheem" (Glory to my Lord, the Most Great) 3 times.',
