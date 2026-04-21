@@ -3872,6 +3872,7 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
   const autoCountdownIntervalRef = useRef(null);
   const autoPlayRef = useRef(false);
   const multiTrackIdxRef = useRef(0);
+  const speedRef = useRef(speed); // always mirrors `speed` state — used inside closures
 
   const reciterInfo = RECITERS.find(r => r.id === reciter);
 
@@ -4007,6 +4008,7 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
 
   /* ---- Audio playback speed sync ---- */
   useEffect(() => {
+    speedRef.current = speed;
     if (audioRef.current) audioRef.current.playbackRate = speed;
   }, [speed, audioRef]);
 
@@ -4023,7 +4025,7 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
       }).catch(() => {});
     }
 
-    runAutoStep(currentStep, steps, speed);
+    runAutoStep(currentStep, steps);
   }
 
   function stopAutoPlay() {
@@ -4050,8 +4052,9 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
     }
   }
 
-  function runAutoStep(stepIdx, stepsArr, spd) {
+  function runAutoStep(stepIdx, stepsArr) {
     if (!autoPlayRef.current) return;
+    const spd = speedRef.current;
 
     const s = stepsArr[stepIdx];
     setCurrentStep(stepIdx);
@@ -4085,7 +4088,7 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
           autoWakeLockRef.current = null;
         }
       } else {
-        runAutoStep(stepIdx + 1, stepsArr, spd);
+        runAutoStep(stepIdx + 1, stepsArr);
       }
     };
 
