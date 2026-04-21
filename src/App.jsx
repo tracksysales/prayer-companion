@@ -14,8 +14,8 @@ import {
 const PRAYERS = {
   Fajr: {
     arabic: 'الفجر', translit: 'Al-Fajr', meaning: 'The Dawn',
-    fard: 2, sunnah: 2, nafl: 0,
-    totalDescription: '2 Sunnah (before) + 2 Fard',
+    fard: 2, sunnah: 2, nafl: 0, total: 4,
+    totalDescription: '4 Rakat — 2 Sunnah (before) + 2 Fard',
     window: 'From true dawn until sunrise',
     description:
       'The dawn prayer, offered between the break of true dawn and sunrise. The Prophet ﷺ said its two Sunnah rakats are "better than the world and all it contains" (Sahih Muslim 725). The adhan for Fajr uniquely includes "As-salatu khayrun minan-nawm" — prayer is better than sleep.',
@@ -24,8 +24,8 @@ const PRAYERS = {
   },
   Dhuhr: {
     arabic: 'الظهر', translit: 'Adh-Dhuhr', meaning: 'The Noon',
-    fard: 4, sunnah: 4, nafl: 2,
-    totalDescription: '4 Sunnah (before) + 4 Fard + 2 Sunnah (after)',
+    fard: 4, sunnah: 6, nafl: 2, total: 12,
+    totalDescription: '12 Rakat — 4 Sunnah (before) + 4 Fard + 2 Sunnah (after) + 2 Nafl',
     window: 'From the sun\'s zenith until Asr begins',
     description:
       'The midday prayer, performed after the sun passes its zenith. On Fridays, Jumu\'ah replaces Dhuhr with a two-rakat congregational prayer preceded by a khutbah (sermon).',
@@ -34,8 +34,8 @@ const PRAYERS = {
   },
   Asr: {
     arabic: 'العصر', translit: 'Al-Asr', meaning: 'The Afternoon',
-    fard: 4, sunnah: 0, nafl: 4,
-    totalDescription: '4 Fard (4 Nafl before are optional and recommended)',
+    fard: 4, sunnah: 4, nafl: 0, total: 8,
+    totalDescription: '8 Rakat — 4 Sunnah Ghair Muʼakkadah (before) + 4 Fard',
     window: 'From mid-afternoon until sunset begins',
     description:
       'The afternoon prayer. The Prophet ﷺ said: "Whoever misses Asr, it is as if he has lost his family and property" (Sahih al-Bukhari 552). It is the "middle prayer" Allah commands us to guard (Quran 2:238 — according to the majority of scholars).',
@@ -44,8 +44,8 @@ const PRAYERS = {
   },
   Maghrib: {
     arabic: 'المغرب', translit: 'Al-Maghrib', meaning: 'The Sunset',
-    fard: 3, sunnah: 2, nafl: 2,
-    totalDescription: '3 Fard + 2 Sunnah (after) + 2 Nafl (optional)',
+    fard: 3, sunnah: 2, nafl: 2, total: 7,
+    totalDescription: '7 Rakat — 3 Fard + 2 Sunnah (after) + 2 Nafl',
     window: 'From sunset until the disappearance of red twilight',
     description:
       'The sunset prayer — the only obligatory prayer with three rakats. It begins immediately after the sun fully sets and has a relatively short window, which is why breaking fast in Ramadan is tied to this time.',
@@ -54,11 +54,11 @@ const PRAYERS = {
   },
   Isha: {
     arabic: 'العشاء', translit: 'Al-Isha', meaning: 'The Night',
-    fard: 4, sunnah: 2, nafl: 3,
-    totalDescription: '4 Fard + 2 Sunnah + 3 Witr (highly emphasized)',
+    fard: 4, sunnah: 6, nafl: 7, total: 17,
+    totalDescription: '17 Rakat — 4 Sunnah (before) + 4 Fard + 2 Sunnah (after) + 2 Nafl + 3 Witr Wajib + 2 Nafl',
     window: 'From the end of twilight until before Fajr',
     description:
-      'The night prayer, followed by the Witr prayer (1 or 3 odd-numbered rakats) which closes the day\'s worship. The Prophet ﷺ said: "Whoever prays Isha in congregation, it is as if he has stood in prayer half the night" (Sahih Muslim 656).',
+      'The night prayer, followed by the Witr prayer (3 rakats — Wajib according to the Hanafi school) which closes the day\'s worship. The Prophet ﷺ said: "Whoever prays Isha in congregation, it is as if he has stood in prayer half the night" (Sahih Muslim 656).',
     history:
       'Witr after Isha was so emphasized by the Prophet ﷺ that some scholars (Hanafi) consider it wajib (necessary). It is the last voluntary act before sleep and traditionally includes the Qunut supplication.',
   },
@@ -835,7 +835,7 @@ export default function App() {
                     <div className="font-display text-2xl">{p}</div>
                     <div className="text-sm text-gold-dim tabular-nums">{formatTime(times[p])}</div>
                     <div className="text-[10px] uppercase tracking-wider mt-2 text-gold-dim">
-                      {PRAYERS[p].fard} Fard{PRAYERS[p].sunnah > 0 ? ` · ${PRAYERS[p].sunnah} Sunnah` : ''}
+                      {PRAYERS[p].total} Rakat · {PRAYERS[p].fard} Fard
                     </div>
                     {isNext && <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-gold shimmer"></div>}
                     <ChevronRight className="absolute bottom-3 right-3 w-4 h-4 text-gold-dim opacity-0 group-hover:opacity-100 transition" />
