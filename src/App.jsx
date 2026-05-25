@@ -3939,11 +3939,11 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
   const speedRef = useRef(speed); // always mirrors `speed` state — used inside closures
   const takbirAudioRef = useRef(null);
 
-  function playTakbirAudio() {
-    if (!takbirAudioRef.current) {
-      takbirAudioRef.current = new Audio('/audio/prayer/Allahu-Akbar.MP3');
-    }
+  function playTransitionAudio(url) {
+    if (!url) return;
+    if (!takbirAudioRef.current) takbirAudioRef.current = new Audio();
     try {
+      if (takbirAudioRef.current.src !== url) takbirAudioRef.current.src = url;
       takbirAudioRef.current.currentTime = 0;
       takbirAudioRef.current.play().catch(() => {});
     } catch {}
@@ -3974,7 +3974,7 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
         phaseType: 'standing',
         duration: i <= 2 ? 45 : 42,
         ttsDua: null,
-        ...(i > 1 && { takbirIn: { arabic: 'اللَّهُ أَكْبَر', translit: 'Allahu Akbar' } }),
+        ...(i > 1 && { takbirIn: { arabic: 'اللَّهُ أَكْبَر', translit: 'Allahu Akbar', audio: '/audio/prayer/Allahu-Akbar.MP3' } }),
       });
       if (i <= 2 && surah) {
         steps.push({
@@ -3990,25 +3990,25 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
         phase: `Rakat ${i} — Ruku`, arabic: 'الركوع',
         text: 'Bow, placing hands on knees. Say "Subhana Rabbiyal-Adheem" (Glory to my Lord, the Most Great) 3 times.',
         audio: null, phaseType: 'bowing', duration: 15, ttsDua: STEP_DUAS.ruku,
-        takbirIn: { arabic: 'اللَّهُ أَكْبَر', translit: 'Allahu Akbar' },
+        takbirIn: { arabic: 'اللَّهُ أَكْبَر', translit: 'Allahu Akbar', audio: '/audio/prayer/Allahu-Akbar.MP3' },
       });
       steps.push({
         phase: `Rakat ${i} — I'tidal`, arabic: 'الاعتدال',
         text: 'Rise from ruku and stand straight. Say "Rabbana wa lakal-hamd" (Our Lord, to You is all praise).',
         audio: null, phaseType: 'standing', duration: 6, ttsDua: STEP_DUAS.itidal,
-        takbirIn: { arabic: 'سَمِعَ اللَّهُ لِمَنْ حَمِدَهُ', translit: "Sami'allahu liman hamidah" },
+        takbirIn: { arabic: 'سَمِعَ اللَّهُ لِمَنْ حَمِدَهُ', translit: "Sami'allahu liman hamidah", audio: '/audio/prayer/Sami-Allahu.MP3' },
       });
       steps.push({
         phase: `Rakat ${i} — Sujud 1`, arabic: 'السجود',
         text: 'Prostrate with forehead, nose, both hands, knees, and toes on the ground. Say "Subhana Rabbiyal-A\'la" (Glory to my Lord, the Most High) 3 times.',
         audio: null, phaseType: 'prostrating', duration: 15, ttsDua: STEP_DUAS.sujud,
-        takbirIn: { arabic: 'اللَّهُ أَكْبَر', translit: 'Allahu Akbar' },
+        takbirIn: { arabic: 'اللَّهُ أَكْبَر', translit: 'Allahu Akbar', audio: '/audio/prayer/Allahu-Akbar.MP3' },
       });
       steps.push({
         phase: `Rakat ${i} — Jalsa`, arabic: 'الجلسة',
         text: 'Sit upright between the two prostrations. Recite this beautiful dua:',
         audio: null, phaseType: 'sitting', duration: 12, ttsDua: STEP_DUAS.jalsa,
-        takbirIn: { arabic: 'اللَّهُ أَكْبَر', translit: 'Allahu Akbar' },
+        takbirIn: { arabic: 'اللَّهُ أَكْبَر', translit: 'Allahu Akbar', audio: '/audio/prayer/Allahu-Akbar.MP3' },
         duaArabic: 'اللَّهُمَّ اغْفِرْ لِي، وَارْحَمْنِي، وَاهْدِنِي، وَاجْبُرْنِي، وَعَافِنِي، وَارْزُقْنِي، وَارْفَعْنِي',
         duaTranslit: "Allāhumma-ghfir lee, warhamnee, wahdinee, wajburnee, wa 'āfinee, warzuqnee, warfa'nee",
         duaEnglish: 'O Allah, forgive me, have mercy on me, guide me, support me, protect me, provide for me, and elevate me.',
@@ -4017,14 +4017,14 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
         phase: `Rakat ${i} — Sujud 2`, arabic: 'السجود',
         text: 'Prostrate again. Say "Subhana Rabbiyal-A\'la" 3 times. This completes one rakat.',
         audio: null, phaseType: 'prostrating', duration: 15, ttsDua: STEP_DUAS.sujud,
-        takbirIn: { arabic: 'اللَّهُ أَكْبَر', translit: 'Allahu Akbar' },
+        takbirIn: { arabic: 'اللَّهُ أَكْبَر', translit: 'Allahu Akbar', audio: '/audio/prayer/Allahu-Akbar.MP3' },
       });
       if (i === 2 && n > 2) {
         steps.push({
           phase: 'Middle Tashahhud (sitting)', arabic: 'التشهد',
           text: 'Sit and recite At-Tahiyyat: "At-tahiyyatu lillahi was-salawatu wat-tayyibat..." ending with the shahadah.',
           audio: AUTO_PRAYER_TRACKS[0].url, phaseType: 'sitting', duration: 25, ttsDua: null,
-          takbirIn: { arabic: 'اللَّهُ أَكْبَر', translit: 'Allahu Akbar' },
+          takbirIn: { arabic: 'اللَّهُ أَكْبَر', translit: 'Allahu Akbar', audio: '/audio/prayer/Allahu-Akbar.MP3' },
         });
       }
       if (i === n) {
@@ -4033,7 +4033,7 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
           text: 'Recite the full Tashahhud, then the complete Durood Ibrahim (salah and barakah), then close with this dua from Surah Ibrahim (14:40–41):',
           audio: AUTO_PRAYER_TRACKS[0].url, multiAudio: AUTO_PRAYER_TRACKS,
           phaseType: 'sitting', duration: 70, ttsDua: null,
-          takbirIn: { arabic: 'اللَّهُ أَكْبَر', translit: 'Allahu Akbar' },
+          takbirIn: { arabic: 'اللَّهُ أَكْبَر', translit: 'Allahu Akbar', audio: '/audio/prayer/Allahu-Akbar.MP3' },
           duaArabic: 'رَبِّ اجْعَلْنِي مُقِيمَ الصَّلَاةِ وَمِنْ ذُرِّيَّتِي ۚ رَبَّنَا وَتَقَبَّلْ دُعَاءِ ﴿٤٠﴾ رَبَّنَا اغْفِرْ لِي وَلِوَالِدَيَّ وَلِلْمُؤْمِنِينَ يَوْمَ يَقُومُ الْحِسَابُ ﴿٤١﴾',
           duaTranslit: "Rabbij'alnee muqeemas-salati wa min thurriyyatee, Rabbana wa taqabbal du'a. Rabbana-ghfir lee wa liwalidayya wa lil-mu'mineena yawma yaqoomul-hisaab.",
           duaEnglish: 'My Lord, make me one who establishes prayer, and from my descendants. Our Lord, accept my supplication. Our Lord, forgive me, my parents, and the believers on the Day of Account. (Quran 14:40–41)',
@@ -4158,8 +4158,8 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
       audioRef.current.onloadedmetadata = null;
     }
 
-    // Play Allahu Akbar audio cue at position transitions
-    if (s.takbirIn?.translit === 'Allahu Akbar') playTakbirAudio();
+    // Play transition audio cue (Allahu Akbar or Sami'allahu) at position transitions
+    if (s.takbirIn?.audio) playTransitionAudio(s.takbirIn.audio);
 
     const advance = () => {
       if (!autoPlayRef.current) return;
@@ -4387,7 +4387,7 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
     setAudioUnavailable(false);
     setManualGroupPlaying(null);
     const nextIdx = Math.min(currentStep + 1, steps.length - 1);
-    if (steps[nextIdx]?.takbirIn?.translit === 'Allahu Akbar') playTakbirAudio();
+    if (steps[nextIdx]?.takbirIn?.audio) playTransitionAudio(steps[nextIdx].takbirIn.audio);
     setCurrentStep(nextIdx);
   }
 
@@ -4401,7 +4401,7 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
     setAudioUnavailable(false);
     setManualGroupPlaying(null);
     const prevIdx = Math.max(currentStep - 1, 0);
-    if (steps[prevIdx]?.takbirIn?.translit === 'Allahu Akbar') playTakbirAudio();
+    if (steps[prevIdx]?.takbirIn?.audio) playTransitionAudio(steps[prevIdx].takbirIn.audio);
     setCurrentStep(prevIdx);
   }
 
