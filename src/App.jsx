@@ -3073,6 +3073,7 @@ function QiblaCompass({ location, onClose }) {
   const [permissionState, setPermissionState] = useState('idle'); // idle | requesting | granted | denied | unsupported
   const [orientationSupported, setOrientationSupported] = useState(false);
   const [isAbsolute, setIsAbsolute] = useState(false);
+  const [accuracyDeg, setAccuracyDeg] = useState(null); // iOS webkitCompassAccuracy
 
   const qiblaAngle = location ? calcQiblaAngle(location.lat, location.lon) : 0;
   const distanceKm = location ? haversineDistance(location.lat, location.lon, 21.4225, 39.8262) : 0;
@@ -3113,21 +3114,24 @@ function QiblaCompass({ location, onClose }) {
   }
 
   function startListening() {
-    // Define handler once and store in ref so cleanup removes the exact same reference
     function handleOrientation(e) {
       let rawHeading = null;
       let absolute = false;
 
       if (e.webkitCompassHeading !== undefined && e.webkitCompassHeading !== null) {
-        // iOS — webkitCompassHeading is always magnetic north-corrected
+        // iOS — webkitCompassHeading is always magnetic-north corrected
         rawHeading = e.webkitCompassHeading;
         absolute = true;
+        // Track iOS accuracy if available
+        if (e.webkitCompassAccuracy != null && e.webkitCompassAccuracy > 0) {
+          setAccuracyDeg(Math.round(e.webkitCompassAccuracy));
+        }
       } else if (e.absolute === true && e.alpha !== null) {
-        // Android deviceorientationabsolute — alpha is relative to magnetic north
+        // Android deviceorientationabsolute
         rawHeading = (360 - e.alpha) % 360;
         absolute = true;
       } else if (!hasAbsoluteRef.current && e.alpha !== null) {
-        // Non-absolute fallback — only use if no absolute data received yet
+        // Non-absolute fallback — only if no absolute data yet
         rawHeading = (360 - e.alpha) % 360;
       }
 
@@ -3138,15 +3142,14 @@ function QiblaCompass({ location, onClose }) {
         setIsAbsolute(true);
       }
 
-      // Low-pass smoothing filter — reduces jitter while tracking movement
-      // Handles the 360°/0° wrap-around boundary correctly
+      // Low-pass smoothing — handles 360°/0° wrap-around
       if (smoothedRef.current === null) {
         smoothedRef.current = rawHeading;
       } else {
         let diff = rawHeading - smoothedRef.current;
         if (diff > 180) diff -= 360;
         if (diff < -180) diff += 360;
-        smoothedRef.current = (smoothedRef.current + 0.18 * diff + 360) % 360;
+        smoothedRef.current = (smoothedRef.current + 0.2 * diff + 360) % 360;
       }
 
       setCompassHeading(Math.round(smoothedRef.current * 10) / 10);
@@ -3157,7 +3160,6 @@ function QiblaCompass({ location, onClose }) {
     window.addEventListener('deviceorientation', handleOrientation, true);
   }
 
-  // Cleanup uses the ref to ensure the exact same function instance is removed
   useEffect(() => {
     return () => {
       if (handlerRef.current) {
@@ -3167,6 +3169,16 @@ function QiblaCompass({ location, onClose }) {
       }
     };
   }, []);
+
+  const accuracyLabel = accuracyDeg != null
+    ? accuracyDeg <= 10 ? `±${accuracyDeg}° High` : accuracyDeg <= 25 ? `±${accuracyDeg}° Medium` : `±${accuracyDeg}° Low`
+    : isAbsolute ? 'High Accuracy' : 'Low Accuracy';
+  const accuracyColor = accuracyDeg != null
+    ? accuracyDeg <= 10 ? 'bg-emerald-900/40 text-emerald-400 border-emerald-500/30'
+      : accuracyDeg <= 25 ? 'bg-amber-900/40 text-amber-400 border-amber-500/30'
+      : 'bg-rose-900/40 text-rose-400 border-rose-500/30'
+    : isAbsolute ? 'bg-emerald-900/40 text-emerald-400 border-emerald-500/30'
+      : 'bg-amber-900/40 text-amber-400 border-amber-500/30';
 
   return (
     <Modal onClose={onClose}>
@@ -3184,7 +3196,7 @@ function QiblaCompass({ location, onClose }) {
         <div className="text-xs text-gold-dim mt-1">from {location?.city}</div>
       </div>
 
-      <div className="flex justify-center mb-6">
+      <div className="flex justify-center mb-4">
         <svg viewBox="0 0 200 200" width="220" height="220" className="mx-auto">
           <circle cx="100" cy="100" r="95" fill="none" stroke="rgba(212,175,55,0.3)" strokeWidth="2" />
           <circle cx="100" cy="100" r="85" fill="rgba(212,175,55,0.04)" stroke="rgba(212,175,55,0.15)" strokeWidth="1" />
@@ -3204,13 +3216,13 @@ function QiblaCompass({ location, onClose }) {
                 stroke={isMajor ? "rgba(212,175,55,0.5)" : "rgba(212,175,55,0.2)"} strokeWidth={isMajor ? 1.5 : 0.8} />
             );
           })}
-          <g transform={`rotate(${needleRotation}, 100, 100)`} style={{ transition: compassHeading !== null ? 'transform 0.25s ease-out' : 'none' }}>
+          <g transform={`rotate(${needleRotation}, 100, 100)`} style={{ transition: compassHeading !== null ? 'transform 0.2s ease-out' : 'none' }}>
             <polygon points="100,25 106,100 100,110 94,100" fill="#d4af37" opacity="0.95" />
             <polygon points="100,175 106,100 100,110 94,100" fill="rgba(212,175,55,0.2)" />
             <circle cx="100" cy="100" r="6" fill="#d4af37" />
             <circle cx="100" cy="100" r="3" fill="#0a1628" />
           </g>
-          <g transform={`rotate(${needleRotation}, 100, 100)`} style={{ transition: compassHeading !== null ? 'transform 0.25s ease-out' : 'none' }}>
+          <g transform={`rotate(${needleRotation}, 100, 100)`} style={{ transition: compassHeading !== null ? 'transform 0.2s ease-out' : 'none' }}>
             <rect x="88" y="10" width="24" height="14" rx="2" fill="#0a1628" stroke="#d4af37" strokeWidth="1.5" />
             <rect x="93" y="13" width="14" height="11" rx="1" fill="#1a2744" stroke="rgba(212,175,55,0.5)" strokeWidth="0.8" />
             <text x="100" y="21.5" textAnchor="middle" fontSize="6" fill="#d4af37" fontFamily="serif">الكعبة</text>
@@ -3218,43 +3230,40 @@ function QiblaCompass({ location, onClose }) {
         </svg>
       </div>
 
-      <div className="text-center mb-6">
+      <div className="text-center mb-5">
         <div className="font-display text-4xl gold-text">{Math.round(qiblaAngle)}°</div>
         <div className="text-sm text-gold-dim">from North (clockwise)</div>
       </div>
 
       {orientationSupported && permissionState === 'idle' && (
         <button onClick={requestOrientation}
-          className="w-full py-3 rounded-sm border-2 border-gold bg-gold/10 hover:bg-gold/20 transition font-semibold gold-text mb-4">
+          className="w-full py-3 rounded-sm border-2 border-gold bg-gold/10 hover:bg-gold/20 transition font-semibold gold-text mb-3">
           Enable Live Compass
         </button>
       )}
       {permissionState === 'requesting' && (
         <div className="text-center text-sm text-gold-dim mb-4">Requesting compass permission...</div>
       )}
-      {permissionState === 'granted' && compassHeading !== null && (
-        <div className="mb-4 space-y-2">
-          <div className="text-center p-3 rounded-sm border border-gold/30 bg-gold/5">
-            <div className="flex items-center justify-center gap-2 mb-1">
-              <div className="text-xs uppercase tracking-widest gold-text">Live Compass Active</div>
-              <div className={`text-[10px] px-1.5 py-0.5 rounded ${isAbsolute ? 'bg-emerald-900/40 text-emerald-400 border border-emerald-500/30' : 'bg-amber-900/40 text-amber-400 border border-amber-500/30'}`}>
-                {isAbsolute ? 'High Accuracy' : 'Low Accuracy'}
+
+      {permissionState === 'granted' && (
+        <div className="mb-3 space-y-2">
+          {compassHeading !== null ? (
+            <div className="p-3 rounded-sm border border-gold/30 bg-gold/5">
+              <div className="flex items-center justify-center gap-2 mb-1">
+                <div className="text-xs uppercase tracking-widest gold-text">Live Compass</div>
+                <div className={`text-[10px] px-1.5 py-0.5 rounded border ${accuracyColor}`}>{accuracyLabel}</div>
               </div>
+              <div className="text-sm text-center">Heading: {Math.round(compassHeading)}° · Qibla: {Math.round(qiblaAngle)}°</div>
             </div>
-            <div className="text-sm">Device heading: {Math.round(compassHeading)}° · Qibla: {Math.round(qiblaAngle)}°</div>
-          </div>
-          {!isAbsolute && (
-            <div className="text-center text-xs text-gold-dim px-2">
-              For better accuracy, hold the phone flat and rotate it in a figure-8 pattern to calibrate the compass.
-            </div>
+          ) : (
+            <div className="text-center text-sm text-gold-dim">Waiting for compass signal...</div>
           )}
+          <div className="p-2.5 rounded border border-gold/20 bg-gold/5 text-xs text-gold-dim text-center leading-relaxed">
+            Hold the phone flat &amp; level for best accuracy. If the needle drifts, wave the phone in a slow figure-8 to recalibrate.
+          </div>
         </div>
       )}
-      {permissionState === 'granted' && compassHeading === null && (
-        <div className="text-center text-sm text-gold-dim mb-4">
-          Waiting for compass signal — hold the phone flat and move it slowly.
-        </div>
-      )}
+
       {permissionState === 'denied' && (
         <div className="text-center text-sm text-gold-dim mb-4">
           Compass permission denied. The needle shows the static Qibla bearing from North.
@@ -3262,12 +3271,12 @@ function QiblaCompass({ location, onClose }) {
       )}
       {!orientationSupported && (
         <div className="text-center text-xs text-gold-dim mb-4">
-          Device orientation not available on this device. The compass shows the calculated Qibla bearing from North.
+          Device orientation not available. The compass shows the calculated Qibla bearing from North.
         </div>
       )}
 
       <div className="text-[10px] text-gold-dim text-center italic mt-2">
-        Qibla direction calculated using haversine formula from your location to the Kaaba, Makkah (21.4225°N, 39.8262°E).
+        Calculated using haversine formula · Kaaba: 21.4225°N, 39.8262°E
       </div>
     </Modal>
   );
@@ -4456,15 +4465,16 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
             <div className="h-full bg-gold transition-all" style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}></div>
           </div>
 
-          {step.takbirIn && (
-            <div className="mb-3 flex items-center justify-center gap-3 py-2.5 px-4 rounded border border-gold/60 bg-gold/10 text-center">
-              <span className="text-[10px] uppercase tracking-widest text-gold-dim shrink-0">Say:</span>
-              <span className="font-arabic text-2xl gold-text leading-tight">{step.takbirIn.arabic}</span>
-              <span className="text-xs italic text-gold-dim shrink-0">{step.takbirIn.translit}</span>
-            </div>
-          )}
-
           <div className="p-5 rounded-sm border gold-border text-center" style={{ background: 'rgba(212,175,55,0.05)' }}>
+            {/* Transition dhikr — shown before the posture so it's the first thing seen */}
+            {step.takbirIn && (
+              <div className="mb-5 pb-4 border-b border-gold/30">
+                <div className="text-[10px] uppercase tracking-widest text-gold-dim mb-2">Say as you move into this position</div>
+                <div className="font-arabic text-5xl gold-text leading-normal mb-1">{step.takbirIn.arabic}</div>
+                <div className="text-sm font-semibold gold-text">{step.takbirIn.translit}</div>
+              </div>
+            )}
+
             {/* Kid-friendly posture illustration */}
             <div className="mb-3">
               <Figure />
