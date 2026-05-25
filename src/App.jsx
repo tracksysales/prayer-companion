@@ -4040,8 +4040,9 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
         });
         steps.push({
           phase: 'Tasleem', arabic: 'التسليم',
-          text: 'Turn your head to the right saying "As-salamu alaykum wa rahmatullah", then to the left with the same. Prayer is complete.',
+          text: 'Turn your head to the right, then to the left — saying the salam each time. Prayer is complete.',
           audio: null, phaseType: 'tasleem', duration: 8, ttsDua: STEP_DUAS.tasleem,
+          takbirIn: { arabic: 'اَلسَّلَامُ عَلَيْكُمْ وَرَحْمَةُ اللهِ', translit: 'As-salamu alaykum wa rahmatullah', audio: '/audio/prayer/assalamualaikum-warahmatullah.MP3' },
         });
       }
     }
