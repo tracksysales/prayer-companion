@@ -3072,11 +3072,17 @@ function QiblaCompass({ location, onClose }) {
   const [compassHeading, setCompassHeading] = useState(null);
   const [permissionState, setPermissionState] = useState('idle'); // idle | requesting | granted | denied | unsupported
   const [orientationSupported, setOrientationSupported] = useState(false);
+  const [isAbsolute, setIsAbsolute] = useState(false);
 
   const qiblaAngle = location ? calcQiblaAngle(location.lat, location.lon) : 0;
   const distanceKm = location ? haversineDistance(location.lat, location.lon, 21.4225, 39.8262) : 0;
 
   const needleRotation = compassHeading !== null ? (qiblaAngle - compassHeading + 360) % 360 : qiblaAngle;
+
+  // Refs for stable handler reference, smoothing, and absolute-mode tracking
+  const smoothedRef = useRef(null);
+  const hasAbsoluteRef = useRef(false);
+  const handlerRef = useRef(null);
 
   useEffect(() => {
     if (typeof DeviceOrientationEvent === 'undefined') {
@@ -3107,28 +3113,60 @@ function QiblaCompass({ location, onClose }) {
   }
 
   function startListening() {
+    // Define handler once and store in ref so cleanup removes the exact same reference
+    function handleOrientation(e) {
+      let rawHeading = null;
+      let absolute = false;
+
+      if (e.webkitCompassHeading !== undefined && e.webkitCompassHeading !== null) {
+        // iOS — webkitCompassHeading is always magnetic north-corrected
+        rawHeading = e.webkitCompassHeading;
+        absolute = true;
+      } else if (e.absolute === true && e.alpha !== null) {
+        // Android deviceorientationabsolute — alpha is relative to magnetic north
+        rawHeading = (360 - e.alpha) % 360;
+        absolute = true;
+      } else if (!hasAbsoluteRef.current && e.alpha !== null) {
+        // Non-absolute fallback — only use if no absolute data received yet
+        rawHeading = (360 - e.alpha) % 360;
+      }
+
+      if (rawHeading === null) return;
+
+      if (absolute && !hasAbsoluteRef.current) {
+        hasAbsoluteRef.current = true;
+        setIsAbsolute(true);
+      }
+
+      // Low-pass smoothing filter — reduces jitter while tracking movement
+      // Handles the 360°/0° wrap-around boundary correctly
+      if (smoothedRef.current === null) {
+        smoothedRef.current = rawHeading;
+      } else {
+        let diff = rawHeading - smoothedRef.current;
+        if (diff > 180) diff -= 360;
+        if (diff < -180) diff += 360;
+        smoothedRef.current = (smoothedRef.current + 0.18 * diff + 360) % 360;
+      }
+
+      setCompassHeading(Math.round(smoothedRef.current * 10) / 10);
+    }
+
+    handlerRef.current = handleOrientation;
     window.addEventListener('deviceorientationabsolute', handleOrientation, true);
     window.addEventListener('deviceorientation', handleOrientation, true);
   }
 
-  function handleOrientation(e) {
-    let heading = null;
-    if (e.webkitCompassHeading !== undefined) {
-      heading = e.webkitCompassHeading;
-    } else if (e.absolute && e.alpha !== null) {
-      heading = (360 - e.alpha) % 360;
-    } else if (e.alpha !== null) {
-      heading = (360 - e.alpha) % 360;
-    }
-    if (heading !== null) setCompassHeading(heading);
-  }
-
+  // Cleanup uses the ref to ensure the exact same function instance is removed
   useEffect(() => {
     return () => {
-      window.removeEventListener('deviceorientationabsolute', handleOrientation, true);
-      window.removeEventListener('deviceorientation', handleOrientation, true);
+      if (handlerRef.current) {
+        window.removeEventListener('deviceorientationabsolute', handlerRef.current, true);
+        window.removeEventListener('deviceorientation', handlerRef.current, true);
+        handlerRef.current = null;
+      }
     };
-  }, []); // eslint-disable-line
+  }, []);
 
   return (
     <Modal onClose={onClose}>
@@ -3166,13 +3204,13 @@ function QiblaCompass({ location, onClose }) {
                 stroke={isMajor ? "rgba(212,175,55,0.5)" : "rgba(212,175,55,0.2)"} strokeWidth={isMajor ? 1.5 : 0.8} />
             );
           })}
-          <g transform={`rotate(${needleRotation}, 100, 100)`} style={{ transition: compassHeading !== null ? 'transform 0.3s ease' : 'none' }}>
+          <g transform={`rotate(${needleRotation}, 100, 100)`} style={{ transition: compassHeading !== null ? 'transform 0.25s ease-out' : 'none' }}>
             <polygon points="100,25 106,100 100,110 94,100" fill="#d4af37" opacity="0.95" />
             <polygon points="100,175 106,100 100,110 94,100" fill="rgba(212,175,55,0.2)" />
             <circle cx="100" cy="100" r="6" fill="#d4af37" />
             <circle cx="100" cy="100" r="3" fill="#0a1628" />
           </g>
-          <g transform={`rotate(${needleRotation}, 100, 100)`}>
+          <g transform={`rotate(${needleRotation}, 100, 100)`} style={{ transition: compassHeading !== null ? 'transform 0.25s ease-out' : 'none' }}>
             <rect x="88" y="10" width="24" height="14" rx="2" fill="#0a1628" stroke="#d4af37" strokeWidth="1.5" />
             <rect x="93" y="13" width="14" height="11" rx="1" fill="#1a2744" stroke="rgba(212,175,55,0.5)" strokeWidth="0.8" />
             <text x="100" y="21.5" textAnchor="middle" fontSize="6" fill="#d4af37" fontFamily="serif">الكعبة</text>
@@ -3188,16 +3226,33 @@ function QiblaCompass({ location, onClose }) {
       {orientationSupported && permissionState === 'idle' && (
         <button onClick={requestOrientation}
           className="w-full py-3 rounded-sm border-2 border-gold bg-gold/10 hover:bg-gold/20 transition font-semibold gold-text mb-4">
-          Enable Live Compass (rotate phone)
+          Enable Live Compass
         </button>
       )}
       {permissionState === 'requesting' && (
         <div className="text-center text-sm text-gold-dim mb-4">Requesting compass permission...</div>
       )}
       {permissionState === 'granted' && compassHeading !== null && (
-        <div className="text-center p-3 rounded-sm border border-gold/30 bg-gold/5 mb-4">
-          <div className="text-xs uppercase tracking-widest gold-text mb-1">Live Compass Active</div>
-          <div className="text-sm">Device heading: {Math.round(compassHeading)}° · Qibla: {Math.round(qiblaAngle)}°</div>
+        <div className="mb-4 space-y-2">
+          <div className="text-center p-3 rounded-sm border border-gold/30 bg-gold/5">
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <div className="text-xs uppercase tracking-widest gold-text">Live Compass Active</div>
+              <div className={`text-[10px] px-1.5 py-0.5 rounded ${isAbsolute ? 'bg-emerald-900/40 text-emerald-400 border border-emerald-500/30' : 'bg-amber-900/40 text-amber-400 border border-amber-500/30'}`}>
+                {isAbsolute ? 'High Accuracy' : 'Low Accuracy'}
+              </div>
+            </div>
+            <div className="text-sm">Device heading: {Math.round(compassHeading)}° · Qibla: {Math.round(qiblaAngle)}°</div>
+          </div>
+          {!isAbsolute && (
+            <div className="text-center text-xs text-gold-dim px-2">
+              For better accuracy, hold the phone flat and rotate it in a figure-8 pattern to calibrate the compass.
+            </div>
+          )}
+        </div>
+      )}
+      {permissionState === 'granted' && compassHeading === null && (
+        <div className="text-center text-sm text-gold-dim mb-4">
+          Waiting for compass signal — hold the phone flat and move it slowly.
         </div>
       )}
       {permissionState === 'denied' && (
@@ -3899,6 +3954,7 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
         phaseType: 'standing',
         duration: i <= 2 ? 45 : 42,
         ttsDua: null,
+        ...(i > 1 && { takbirIn: { arabic: 'اللَّهُ أَكْبَر', translit: 'Allahu Akbar' } }),
       });
       if (i <= 2 && surah) {
         steps.push({
@@ -3912,23 +3968,27 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
       }
       steps.push({
         phase: `Rakat ${i} — Ruku`, arabic: 'الركوع',
-        text: 'Say "Allahu Akbar" and bow, placing hands on knees. Say "Subhana Rabbiyal-Adheem" (Glory to my Lord, the Most Great) 3 times.',
+        text: 'Bow, placing hands on knees. Say "Subhana Rabbiyal-Adheem" (Glory to my Lord, the Most Great) 3 times.',
         audio: null, phaseType: 'bowing', duration: 15, ttsDua: STEP_DUAS.ruku,
+        takbirIn: { arabic: 'اللَّهُ أَكْبَر', translit: 'Allahu Akbar' },
       });
       steps.push({
         phase: `Rakat ${i} — I'tidal`, arabic: 'الاعتدال',
-        text: 'Rise saying "Sami\'allahu liman hamidah" (Allah hears the one who praises Him). Then standing: "Rabbana wa lakal-hamd".',
+        text: 'Rise from ruku and stand straight. Say "Rabbana wa lakal-hamd" (Our Lord, to You is all praise).',
         audio: null, phaseType: 'standing', duration: 6, ttsDua: STEP_DUAS.itidal,
+        takbirIn: { arabic: 'سَمِعَ اللَّهُ لِمَنْ حَمِدَهُ', translit: "Sami'allahu liman hamidah" },
       });
       steps.push({
         phase: `Rakat ${i} — Sujud 1`, arabic: 'السجود',
-        text: 'Say "Allahu Akbar" and prostrate with forehead, nose, hands, knees, toes on ground. Say "Subhana Rabbiyal-A\'la" (Glory to my Lord, the Most High) 3 times.',
+        text: 'Prostrate with forehead, nose, both hands, knees, and toes on the ground. Say "Subhana Rabbiyal-A\'la" (Glory to my Lord, the Most High) 3 times.',
         audio: null, phaseType: 'prostrating', duration: 15, ttsDua: STEP_DUAS.sujud,
+        takbirIn: { arabic: 'اللَّهُ أَكْبَر', translit: 'Allahu Akbar' },
       });
       steps.push({
         phase: `Rakat ${i} — Jalsa`, arabic: 'الجلسة',
-        text: 'Rise to sitting position between the two prostrations. Recite this beautiful dua:',
+        text: 'Sit upright between the two prostrations. Recite this beautiful dua:',
         audio: null, phaseType: 'sitting', duration: 12, ttsDua: STEP_DUAS.jalsa,
+        takbirIn: { arabic: 'اللَّهُ أَكْبَر', translit: 'Allahu Akbar' },
         duaArabic: 'اللَّهُمَّ اغْفِرْ لِي، وَارْحَمْنِي، وَاهْدِنِي، وَاجْبُرْنِي، وَعَافِنِي، وَارْزُقْنِي، وَارْفَعْنِي',
         duaTranslit: "Allāhumma-ghfir lee, warhamnee, wahdinee, wajburnee, wa 'āfinee, warzuqnee, warfa'nee",
         duaEnglish: 'O Allah, forgive me, have mercy on me, guide me, support me, protect me, provide for me, and elevate me.',
@@ -3937,12 +3997,14 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
         phase: `Rakat ${i} — Sujud 2`, arabic: 'السجود',
         text: 'Prostrate again. Say "Subhana Rabbiyal-A\'la" 3 times. This completes one rakat.',
         audio: null, phaseType: 'prostrating', duration: 15, ttsDua: STEP_DUAS.sujud,
+        takbirIn: { arabic: 'اللَّهُ أَكْبَر', translit: 'Allahu Akbar' },
       });
       if (i === 2 && n > 2) {
         steps.push({
           phase: 'Middle Tashahhud (sitting)', arabic: 'التشهد',
-          text: 'Sit and recite At-Tahiyyat: "At-tahiyyatu lillahi was-salawatu wat-tayyibat..." ending with the shahadah. Then rise saying "Allahu Akbar" to continue.',
+          text: 'Sit and recite At-Tahiyyat: "At-tahiyyatu lillahi was-salawatu wat-tayyibat..." ending with the shahadah.',
           audio: AUTO_PRAYER_TRACKS[0].url, phaseType: 'sitting', duration: 25, ttsDua: null,
+          takbirIn: { arabic: 'اللَّهُ أَكْبَر', translit: 'Allahu Akbar' },
         });
       }
       if (i === n) {
@@ -3951,6 +4013,7 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
           text: 'Recite the full Tashahhud, then the complete Durood Ibrahim (salah and barakah), then close with this dua from Surah Ibrahim (14:40–41):',
           audio: AUTO_PRAYER_TRACKS[0].url, multiAudio: AUTO_PRAYER_TRACKS,
           phaseType: 'sitting', duration: 70, ttsDua: null,
+          takbirIn: { arabic: 'اللَّهُ أَكْبَر', translit: 'Allahu Akbar' },
           duaArabic: 'رَبِّ اجْعَلْنِي مُقِيمَ الصَّلَاةِ وَمِنْ ذُرِّيَّتِي ۚ رَبَّنَا وَتَقَبَّلْ دُعَاءِ ﴿٤٠﴾ رَبَّنَا اغْفِرْ لِي وَلِوَالِدَيَّ وَلِلْمُؤْمِنِينَ يَوْمَ يَقُومُ الْحِسَابُ ﴿٤١﴾',
           duaTranslit: "Rabbij'alnee muqeemas-salati wa min thurriyyatee, Rabbana wa taqabbal du'a. Rabbana-ghfir lee wa liwalidayya wa lil-mu'mineena yawma yaqoomul-hisaab.",
           duaEnglish: 'My Lord, make me one who establishes prayer, and from my descendants. Our Lord, accept my supplication. Our Lord, forgive me, my parents, and the believers on the Day of Account. (Quran 14:40–41)',
@@ -4392,6 +4455,14 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
           <div className="h-1 rounded bg-gold/10 mb-5 overflow-hidden">
             <div className="h-full bg-gold transition-all" style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}></div>
           </div>
+
+          {step.takbirIn && (
+            <div className="mb-3 flex items-center justify-center gap-3 py-2.5 px-4 rounded border border-gold/60 bg-gold/10 text-center">
+              <span className="text-[10px] uppercase tracking-widest text-gold-dim shrink-0">Say:</span>
+              <span className="font-arabic text-2xl gold-text leading-tight">{step.takbirIn.arabic}</span>
+              <span className="text-xs italic text-gold-dim shrink-0">{step.takbirIn.translit}</span>
+            </div>
+          )}
 
           <div className="p-5 rounded-sm border gold-border text-center" style={{ background: 'rgba(212,175,55,0.05)' }}>
             {/* Kid-friendly posture illustration */}
