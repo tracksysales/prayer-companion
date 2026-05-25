@@ -3937,6 +3937,17 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
   const autoPlayRef = useRef(false);
   const multiTrackIdxRef = useRef(0);
   const speedRef = useRef(speed); // always mirrors `speed` state — used inside closures
+  const takbirAudioRef = useRef(null);
+
+  function playTakbirAudio() {
+    if (!takbirAudioRef.current) {
+      takbirAudioRef.current = new Audio('/audio/prayer/Allahu-Akbar.MP3');
+    }
+    try {
+      takbirAudioRef.current.currentTime = 0;
+      takbirAudioRef.current.play().catch(() => {});
+    } catch {}
+  }
 
   const reciterInfo = RECITERS.find(r => r.id === reciter);
 
@@ -4075,6 +4086,10 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
         autoWakeLockRef.current.release().catch(() => {});
         autoWakeLockRef.current = null;
       }
+      if (takbirAudioRef.current) {
+        takbirAudioRef.current.pause();
+        takbirAudioRef.current = null;
+      }
     };
   }, []); // eslint-disable-line
 
@@ -4142,6 +4157,9 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
       audioRef.current.onended = null;
       audioRef.current.onloadedmetadata = null;
     }
+
+    // Play Allahu Akbar audio cue at position transitions
+    if (s.takbirIn?.translit === 'Allahu Akbar') playTakbirAudio();
 
     const advance = () => {
       if (!autoPlayRef.current) return;
@@ -4368,7 +4386,9 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
     multiTrackIdxRef.current = 0;
     setAudioUnavailable(false);
     setManualGroupPlaying(null);
-    setCurrentStep(Math.min(currentStep + 1, steps.length - 1));
+    const nextIdx = Math.min(currentStep + 1, steps.length - 1);
+    if (steps[nextIdx]?.takbirIn?.translit === 'Allahu Akbar') playTakbirAudio();
+    setCurrentStep(nextIdx);
   }
 
   function prev() {
@@ -4380,7 +4400,9 @@ function GuidedPrayer({ rakats, setRakats, reciter, setReciter, speed, setSpeed,
     multiTrackIdxRef.current = 0;
     setAudioUnavailable(false);
     setManualGroupPlaying(null);
-    setCurrentStep(Math.max(currentStep - 1, 0));
+    const prevIdx = Math.max(currentStep - 1, 0);
+    if (steps[prevIdx]?.takbirIn?.translit === 'Allahu Akbar') playTakbirAudio();
+    setCurrentStep(prevIdx);
   }
 
   /* ---- Render ---- */
